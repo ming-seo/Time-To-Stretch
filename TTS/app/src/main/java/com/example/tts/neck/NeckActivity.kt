@@ -54,6 +54,9 @@ class NeckActivity : AppCompatActivity() {
         tvLogDir = findViewById(R.id.tvLogDir)
 
         btnToggle.setOnClickListener { onToggleClicked() }
+        findViewById<Button>(R.id.btnOpenCollect).setOnClickListener {
+            startActivity(Intent(this, NeckCollectActivity::class.java))
+        }
     }
 
     override fun onResume() {
