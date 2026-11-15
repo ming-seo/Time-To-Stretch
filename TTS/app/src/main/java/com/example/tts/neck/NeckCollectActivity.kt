@@ -65,7 +65,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val faceDetector: FaceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .build()
     )
