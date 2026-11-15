@@ -13,4 +13,7 @@ object TiltCalculator {
         val horizontal = sqrt((gx * gx + gy * gy).toDouble())
         return Math.toDegrees(atan2(gz.toDouble(), horizontal))
     }
+
+    /** Screen rotation about its normal: 0° = upright portrait, ±90° = landscape. Unstable when the phone is flat. */
+    fun rollDegrees(gx: Float, gy: Float): Double = Math.toDegrees(atan2(gx.toDouble(), gy.toDouble()))
 }

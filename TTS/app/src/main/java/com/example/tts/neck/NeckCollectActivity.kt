@@ -3,9 +3,14 @@ package com.example.tts.neck
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.PointF
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
 import android.util.Size
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,17 +40,27 @@ import com.google.mlkit.vision.pose.PoseDetector
 import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import com.google.android.gms.tasks.Tasks
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.hypot
 
-/** Mode B data collection screen (step 3: front camera preview + face and shoulder features). */
-class NeckCollectActivity : AppCompatActivity() {
+/** Mode B data collection screen: front camera face/shoulder features + phone tilt, recorded to frame CSV. */
+class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var previewView: PreviewView
     private lateinit var overlayView: KeypointOverlayView
     private lateinit var tvFeatures: TextView
+    private lateinit var btnRecord: Button
+    private lateinit var sensorManager: SensorManager
+
+    /** Latest gravity vector; replaced (not mutated) so the analysis thread reads a consistent copy. */
+    @Volatile
+    private var latestGravity: FloatArray? = null
+    private var recorder: FrameCsvRecorder? = null
 
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val faceDetector: FaceDetector = FaceDetection.getClient(
@@ -77,12 +92,48 @@ class NeckCollectActivity : AppCompatActivity() {
         previewView = findViewById(R.id.previewView)
         overlayView = findViewById(R.id.overlayView)
         tvFeatures = findViewById(R.id.tvFeatures)
+        btnRecord = findViewById(R.id.btnRecord)
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+
+        btnRecord.setOnClickListener { if (recorder == null) startRecording() else stopRecording() }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCamera()
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY) ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER))
+            ?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sensorManager.unregisterListener(this)
+        stopRecording()
+    }
+
+    override fun onSensorChanged(event: SensorEvent) {
+        latestGravity = event.values.copyOf(3)
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+
+    private fun startRecording() {
+        val name = "frames_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".csv"
+        recorder = FrameCsvRecorder(File(NeckCsvLogger.logDir(this), name))
+        btnRecord.text = "기록 중지 (0프레임)"
+    }
+
+    private fun stopRecording() {
+        val r = recorder ?: return
+        recorder = null
+        r.close()
+        btnRecord.text = "기록 시작"
+        Toast.makeText(this, "${r.frameCount}프레임 저장: ${r.file.name}", Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroy() {
@@ -133,6 +184,8 @@ class NeckCollectActivity : AppCompatActivity() {
             imageProxy.close()
             return
         }
+        val tsMs = System.currentTimeMillis()
+        val gravity = latestGravity
         val rotation = imageProxy.imageInfo.rotationDegrees
         val uprightWidth = if (rotation % 180 == 0) imageProxy.width else imageProxy.height
         val uprightHeight = if (rotation % 180 == 0) imageProxy.height else imageProxy.width
@@ -155,8 +208,34 @@ class NeckCollectActivity : AppCompatActivity() {
                     null
                 }
                 showFeatures(face, shoulders, uprightWidth, uprightHeight)
+                recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders)
             }
             .addOnCompleteListener { imageProxy.close() }
+    }
+
+    private fun recordFrame(
+        tsMs: Long,
+        imageWidth: Int,
+        imageHeight: Int,
+        gravity: FloatArray?,
+        face: FaceFeatures?,
+        shoulders: ShoulderFeatures?,
+    ) {
+        val r = recorder ?: return
+        r.write(
+            listOf(
+                tsMs, imageWidth, imageHeight,
+                gravity?.let { TiltCalculator.tiltDegrees(it[0], it[1], it[2]) },
+                gravity?.let { TiltCalculator.rollDegrees(it[0], it[1]) },
+                face?.pitch, face?.yaw, face?.roll,
+                face?.nose?.x, face?.nose?.y,
+                face?.leftEye?.x, face?.leftEye?.y,
+                face?.rightEye?.x, face?.rightEye?.y,
+                shoulders?.left?.x, shoulders?.left?.y, shoulders?.leftLikelihood,
+                shoulders?.right?.x, shoulders?.right?.y, shoulders?.rightLikelihood,
+            )
+        )
+        btnRecord.text = "기록 중지 (${r.frameCount}프레임)"
     }
 
     private fun showFeatures(face: FaceFeatures?, shoulders: ShoulderFeatures?, imageWidth: Int, imageHeight: Int) {

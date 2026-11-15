@@ -12,7 +12,7 @@ import java.util.Locale
  */
 class NeckCsvLogger(context: Context) {
 
-    val dir: File = File(context.getExternalFilesDir(null) ?: context.filesDir, "neck_logs").apply { mkdirs() }
+    val dir: File = logDir(context)
 
     fun logWindow(w: WindowResult) = append(
         "windows",
@@ -44,6 +44,9 @@ class NeckCsvLogger(context: Context) {
     private fun fmt(v: Double?): String = v?.let { String.format(Locale.US, "%.3f", it) } ?: ""
 
     companion object {
+        fun logDir(context: Context): File =
+            File(context.getExternalFilesDir(null) ?: context.filesDir, "neck_logs").apply { mkdirs() }
+
         private const val WINDOW_HEADER =
             "start_ms,end_ms,screen_in_use,excluded,tilt_n,tilt_mean_deg,tilt_std_deg,linacc_n,linacc_mean,linacc_max"
         private const val CYCLE_HEADER =
