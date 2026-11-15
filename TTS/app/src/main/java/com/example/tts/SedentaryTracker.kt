@@ -47,6 +47,18 @@ class SedentaryTracker(context: Context) {
 
     fun getLog(): String = prefs.getString(KEY_LOG, "") ?: ""
 
+    /** Call when monitoring stops: the stored STILL state is no longer being kept up to date. */
+    fun reset() {
+        prefs.edit {
+            putBoolean(KEY_IS_STILL, false)
+            remove(KEY_STILL_SINCE)
+        }
+    }
+
+    fun clearLog() {
+        prefs.edit { remove(KEY_LOG) }
+    }
+
     private fun appendLog(line: String) {
         val existing = getLog().split("\n").filter { it.isNotBlank() }
         val updated = (listOf(line) + existing).take(MAX_LOG_LINES).joinToString("\n")
