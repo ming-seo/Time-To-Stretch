@@ -49,7 +49,7 @@ data class CycleResult(
  */
 class PostureWindowAggregator(
     private val windowsPerCycle: Int = 12,
-    private val staticLinAccMax: Double = 0.3,
+    private val staticLinAccMax: Double = 0.15,
 ) {
 
     private var windowStartMs = 0L
