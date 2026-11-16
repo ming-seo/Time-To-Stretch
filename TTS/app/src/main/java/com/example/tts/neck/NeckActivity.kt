@@ -16,13 +16,14 @@ import androidx.core.content.ContextCompat
 import com.example.tts.R
 import java.util.Locale
 
-/** P0 debug screen for mode A: start/stop sensing and show the latest values. */
+/** Debug screen for mode A: start/stop sensing and show the latest values, cycle state and D_n. */
 class NeckActivity : AppCompatActivity() {
 
     private lateinit var btnToggle: Button
     private lateinit var tvTilt: TextView
     private lateinit var tvScreenInUse: TextView
     private lateinit var tvLastCycle: TextView
+    private lateinit var tvDebt: TextView
     private lateinit var tvLogDir: TextView
 
     private val refreshHandler = Handler(Looper.getMainLooper())
@@ -51,6 +52,7 @@ class NeckActivity : AppCompatActivity() {
         tvTilt = findViewById(R.id.tvTilt)
         tvScreenInUse = findViewById(R.id.tvScreenInUse)
         tvLastCycle = findViewById(R.id.tvLastCycle)
+        tvDebt = findViewById(R.id.tvDebt)
         tvLogDir = findViewById(R.id.tvLogDir)
 
         btnToggle.setOnClickListener { onToggleClicked() }
@@ -99,8 +101,11 @@ class NeckActivity : AppCompatActivity() {
         tvScreenInUse.text = "화면 사용 중: " + if (!state.running) "-" else if (state.screenInUse) "예" else "아니오"
         tvLastCycle.text = state.lastCycle?.let {
             "마지막 60초: CATA " + (it.cata?.let { c -> fmt(c) + "°" } ?: "-") +
-                " · 유효 윈도우 ${it.validWindowCount}/${it.windowCount}"
+                " · 유효 윈도우 ${it.validWindowCount}/${it.windowCount}" +
+                " · 상태 ${state.lastState ?: "-"}"
         } ?: "마지막 60초: -"
+        val debt = getSharedPreferences(NeckDebtCalculator.PREFS, MODE_PRIVATE).getFloat(NeckDebtCalculator.KEY_DEBT, 0f)
+        tvDebt.text = "D_n: " + String.format(Locale.US, "%.2f", debt)
         tvLogDir.text = "로그: " + (state.logDir ?: "-")
     }
 

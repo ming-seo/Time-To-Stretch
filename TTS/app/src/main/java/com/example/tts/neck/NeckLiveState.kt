@@ -6,5 +6,6 @@ object NeckLiveState {
     var screenInUse = false
     var currentTilt: Double? = null
     var lastCycle: CycleResult? = null
+    var lastState: NeckState? = null
     var logDir: String? = null
 }

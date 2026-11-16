@@ -24,9 +24,9 @@ import androidx.core.app.NotificationCompat
 import kotlin.math.sqrt
 
 /**
- * Mode A (SmartPose-based) background sensing, P0 logging only.
+ * Mode A (SmartPose-based) background sensing.
  * While the screen is on and unlocked, samples gravity (tilt) and linear acceleration,
- * aggregates 5-second windows / 60-second cycles, and writes them to CSV.
+ * aggregates 5-second windows / 60-second cycles, judges each cycle, updates D_n, and writes CSV.
  */
 class NeckSensingService : Service(), SensorEventListener {
 
@@ -37,6 +37,8 @@ class NeckSensingService : Service(), SensorEventListener {
     private lateinit var logger: NeckCsvLogger
 
     private val aggregator = PostureWindowAggregator()
+    private val debtCalculator = NeckDebtCalculator()
+    private var debt = 0.0
     private val handler = Handler(Looper.getMainLooper())
     private var sensorsRegistered = false
     private var screenInUse = false
@@ -64,6 +66,7 @@ class NeckSensingService : Service(), SensorEventListener {
         keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         logger = NeckCsvLogger(this)
+        debt = prefs().getFloat(NeckDebtCalculator.KEY_DEBT, 0f).toDouble()
 
         startInForeground()
 
@@ -128,8 +131,12 @@ class NeckSensingService : Service(), SensorEventListener {
         val (window, cycle) = aggregator.closeWindow(System.currentTimeMillis(), screenInUse)
         logger.logWindow(window)
         if (cycle != null) {
-            logger.logCycle(cycle)
+            val state = debtCalculator.judge(cycle)
+            debt = debtCalculator.update(debt, state)
+            prefs().edit().putFloat(NeckDebtCalculator.KEY_DEBT, debt.toFloat()).apply()
+            logger.logCycle(cycle, state, debt)
             NeckLiveState.lastCycle = cycle
+            NeckLiveState.lastState = state
         }
     }
 
@@ -146,6 +153,8 @@ class NeckSensingService : Service(), SensorEventListener {
             NeckLiveState.currentTilt = null
         }
     }
+
+    private fun prefs() = getSharedPreferences(NeckDebtCalculator.PREFS, MODE_PRIVATE)
 
     private fun isScreenInUse(): Boolean = powerManager.isInteractive && !keyguardManager.isKeyguardLocked
 
