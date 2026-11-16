@@ -46,6 +46,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.abs
 import kotlin.math.hypot
 
 /** Mode B data collection screen: front camera face/shoulder features + phone tilt, recorded to frame CSV. */
@@ -55,7 +56,14 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var overlayView: KeypointOverlayView
     private lateinit var tvFeatures: TextView
     private lateinit var btnRecord: Button
+    private lateinit var btnCalibrate: Button
     private lateinit var sensorManager: SensorManager
+
+    /** Reference (upright) value of nose–neck / eye distance; null until calibrated. */
+    private var normRef: Float? = null
+    /** Calibration in progress: end time and the ratios of frames that met the reference-posture conditions. */
+    private var calibrationEndMs: Long? = null
+    private val calibrationRatios = mutableListOf<Float>()
 
     /** Latest gravity vector; replaced (not mutated) so the analysis thread reads a consistent copy. */
     @Volatile
@@ -96,6 +104,9 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
         btnRecord.setOnClickListener { if (recorder == null) startRecording() else stopRecording() }
+        btnCalibrate = findViewById(R.id.btnCalibrate)
+        btnCalibrate.setOnClickListener { startCalibration() }
+        normRef = getSharedPreferences(PREFS, MODE_PRIVATE).getFloat(KEY_NORM_REF, Float.NaN).takeUnless { it.isNaN() }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCamera()
@@ -114,6 +125,9 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         super.onPause()
         sensorManager.unregisterListener(this)
         stopRecording()
+        calibrationEndMs = null
+        btnCalibrate.isEnabled = true
+        btnCalibrate.text = "기준 자세 측정"
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -134,6 +148,54 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         r.close()
         btnRecord.text = "기록 시작"
         Toast.makeText(this, "${r.frameCount}프레임 저장: ${r.file.name}", Toast.LENGTH_LONG).show()
+    }
+
+    private fun startCalibration() {
+        calibrationRatios.clear()
+        calibrationEndMs = System.currentTimeMillis() + CALIBRATION_MS
+        btnCalibrate.isEnabled = false
+        btnCalibrate.text = "기준 자세 측정 중…"
+    }
+
+    /** Collects reference-posture frames for 3 s, then stores the median ratio as Norm_ref. */
+    private fun updateCalibration(tsMs: Long, gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?) {
+        val endMs = calibrationEndMs ?: return
+        val tilt = gravity?.let { TiltCalculator.tiltDegrees(it[0], it[1], it[2]) }
+        val ratio = rawRatio(face, shoulders)
+        if (tilt != null && abs(tilt) <= CAL_MAX_TILT_DEG &&
+            face != null && abs(face.pitch) <= CAL_MAX_PITCH_DEG &&
+            shoulders != null && shoulders.leftLikelihood >= MIN_SHOULDER_LIKELIHOOD &&
+            shoulders.rightLikelihood >= MIN_SHOULDER_LIKELIHOOD && ratio != null
+        ) {
+            calibrationRatios.add(ratio)
+        }
+        btnCalibrate.text = "기준 자세 측정 중… (${calibrationRatios.size}프레임)"
+        if (tsMs < endMs) return
+
+        calibrationEndMs = null
+        btnCalibrate.isEnabled = true
+        btnCalibrate.text = "기준 자세 측정"
+        if (calibrationRatios.size < CAL_MIN_FRAMES) {
+            Toast.makeText(
+                this,
+                "측정 실패: 조건 만족 ${calibrationRatios.size}프레임 (폰 수직 ±15°, 얼굴 pitch ±10°, 양 어깨 검출)",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        val sorted = calibrationRatios.sorted()
+        val median = if (sorted.size % 2 == 1) sorted[sorted.size / 2] else (sorted[sorted.size / 2 - 1] + sorted[sorted.size / 2]) / 2
+        normRef = median
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putFloat(KEY_NORM_REF, median).apply()
+        Toast.makeText(this, "Norm_ref ${fmt(median)} 저장 (${sorted.size}프레임)", Toast.LENGTH_LONG).show()
+    }
+
+    /** nose–neck distance / eye distance (image px), before dividing by Norm_ref. */
+    private fun rawRatio(face: FaceFeatures?, shoulders: ShoulderFeatures?): Float? {
+        val nose = face?.nose ?: return null
+        val eyeDist = face.eyeDistance() ?: return null
+        if (shoulders == null || eyeDist <= 0f) return null
+        return hypot(nose.x - shoulders.neck.x, nose.y - shoulders.neck.y) / eyeDist
     }
 
     override fun onDestroy() {
@@ -207,6 +269,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                     Log.w(TAG, "Pose detection failed", poseTask.exception)
                     null
                 }
+                updateCalibration(tsMs, gravity, face, shoulders)
                 showFeatures(face, shoulders, uprightWidth, uprightHeight)
                 recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders)
             }
@@ -254,13 +317,10 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         val shoulderText = if (shoulders == null) {
             "어깨: 없음"
         } else {
-            val nose = face?.nose
-            val noseToNeck = nose?.let { hypot(it.x - shoulders.neck.x, it.y - shoulders.neck.y) }
-            val norm = if (noseToNeck != null && eyeDist != null && eyeDist > 0f) noseToNeck / eyeDist else null
             "어깨 신뢰도 L ${fmt(shoulders.leftLikelihood)} · R ${fmt(shoulders.rightLikelihood)}\n" +
-                "코–목 / 눈 사이: ${norm?.let { fmt(it) } ?: "-"}"
+                "코–목 / 눈 사이: ${rawRatio(face, shoulders)?.let { fmt(it) } ?: "-"}"
         }
-        tvFeatures.text = faceText + "\n" + shoulderText
+        tvFeatures.text = faceText + "\n" + shoulderText + "\nNorm_ref: ${normRef?.let { fmt(it) } ?: "미설정"}"
     }
 
     private fun fmt(v: Float): String = String.format(Locale.US, "%.2f", v)
@@ -309,5 +369,12 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
     companion object {
         private const val TAG = "NeckCollectActivity"
+        private const val PREFS = "neck"
+        private const val KEY_NORM_REF = "norm_ref"
+        private const val CALIBRATION_MS = 3000L
+        private const val CAL_MAX_TILT_DEG = 15.0
+        private const val CAL_MAX_PITCH_DEG = 10f
+        private const val CAL_MIN_FRAMES = 5
+        private const val MIN_SHOULDER_LIKELIHOOD = 0.5f
     }
 }
