@@ -64,6 +64,8 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     /** Calibration in progress: end time and the ratios of frames that met the reference-posture conditions. */
     private var calibrationEndMs: Long? = null
     private val calibrationRatios = mutableListOf<Float>()
+    /** Watanabe neck angle model; null if the asset is missing. */
+    private var neckModel: WatanabeNeckModel? = null
 
     /** Latest gravity vector; replaced (not mutated) so the analysis thread reads a consistent copy. */
     @Volatile
@@ -107,6 +109,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         btnCalibrate = findViewById(R.id.btnCalibrate)
         btnCalibrate.setOnClickListener { startCalibration() }
         normRef = getSharedPreferences(PREFS, MODE_PRIVATE).getFloat(KEY_NORM_REF, Float.NaN).takeUnless { it.isNaN() }
+        neckModel = WatanabeNeckModel.load(this)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCamera()
@@ -270,8 +273,9 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                     null
                 }
                 updateCalibration(tsMs, gravity, face, shoulders)
-                showFeatures(face, shoulders, uprightWidth, uprightHeight)
-                recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders)
+                val neckDeg = predictNeck(gravity, face, shoulders)
+                showFeatures(face, shoulders, uprightWidth, uprightHeight, neckDeg)
+                recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders, neckDeg)
             }
             .addOnCompleteListener { imageProxy.close() }
     }
@@ -283,6 +287,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         gravity: FloatArray?,
         face: FaceFeatures?,
         shoulders: ShoulderFeatures?,
+        neckDeg: Double?,
     ) {
         val r = recorder ?: return
         r.write(
@@ -296,12 +301,31 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                 face?.rightEye?.x, face?.rightEye?.y,
                 shoulders?.left?.x, shoulders?.left?.y, shoulders?.leftLikelihood,
                 shoulders?.right?.x, shoulders?.right?.y, shoulders?.rightLikelihood,
+                normRef, neckDeg,
             )
         )
         btnRecord.text = "기록 중지 (${r.frameCount}프레임)"
     }
 
-    private fun showFeatures(face: FaceFeatures?, shoulders: ShoulderFeatures?, imageWidth: Int, imageHeight: Int) {
+    /** Neck angle (°) from the Watanabe model; null without model, Norm_ref, phone tilt, face or both shoulders. */
+    private fun predictNeck(gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?): Double? {
+        val model = neckModel ?: return null
+        val ref = normRef ?: return null
+        val g = gravity ?: return null
+        if (face == null || shoulders == null ||
+            shoulders.leftLikelihood < MIN_SHOULDER_LIKELIHOOD || shoulders.rightLikelihood < MIN_SHOULDER_LIKELIHOOD
+        ) return null
+        val ratio = rawRatio(face, shoulders) ?: return null
+        return model.predict((ratio / ref).toDouble(), TiltCalculator.tiltDegrees(g[0], g[1], g[2]), face.pitch.toDouble())
+    }
+
+    private fun showFeatures(
+        face: FaceFeatures?,
+        shoulders: ShoulderFeatures?,
+        imageWidth: Int,
+        imageHeight: Int,
+        neckDeg: Double?,
+    ) {
         overlayView.setPoints(
             imageWidth,
             imageHeight,
@@ -320,7 +344,12 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
             "어깨 신뢰도 L ${fmt(shoulders.leftLikelihood)} · R ${fmt(shoulders.rightLikelihood)}\n" +
                 "코–목 / 눈 사이: ${rawRatio(face, shoulders)?.let { fmt(it) } ?: "-"}"
         }
-        tvFeatures.text = faceText + "\n" + shoulderText + "\nNorm_ref: ${normRef?.let { fmt(it) } ?: "미설정"}"
+        tvFeatures.text = faceText + "\n" + shoulderText + "\nNorm_ref: ${normRef?.let { fmt(it) } ?: "미설정"}" +
+            "\n목 각도: " + when {
+                neckModel == null -> "모델 파일 없음"
+                neckDeg == null -> "-"
+                else -> String.format(Locale.US, "%.1f°", neckDeg)
+            }
     }
 
     private fun fmt(v: Float): String = String.format(Locale.US, "%.2f", v)

@@ -26,6 +26,7 @@ class FrameCsvRecorder(val file: File) {
         const val HEADER =
             "ts_ms,image_w,image_h,phone_tilt_deg,phone_roll_deg,face_pitch,face_yaw,face_roll," +
                 "nose_x,nose_y,eye_l_x,eye_l_y,eye_r_x,eye_r_y," +
-                "sh_l_x,sh_l_y,sh_l_likelihood,sh_r_x,sh_r_y,sh_r_likelihood"
+                "sh_l_x,sh_l_y,sh_l_likelihood,sh_r_x,sh_r_y,sh_r_likelihood," +
+                "norm_ref,neck_pred_deg"
     }
 }
