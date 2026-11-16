@@ -21,6 +21,7 @@ class NeckCsvLogger(context: Context) {
             w.startMs, w.endMs, w.screenInUse, w.excluded,
             w.tiltCount, fmt(w.tiltMean), fmt(w.tiltStd),
             w.linAccCount, fmt(w.linAccMean), fmt(w.linAccMax),
+            w.staticDevice, w.excludeReasons.sorted().joinToString("|"),
         ).joinToString(","),
         w.startMs,
     )
@@ -31,6 +32,7 @@ class NeckCsvLogger(context: Context) {
         listOf(
             c.startMs, c.endMs, c.windowCount, c.validWindowCount,
             fmt(c.cata), fmt(c.tiltStd), fmt(c.linAccMean), fmt(c.linAccMax),
+            c.staticWindowCount,
         ).joinToString(","),
         c.startMs,
     )
@@ -48,9 +50,11 @@ class NeckCsvLogger(context: Context) {
             File(context.getExternalFilesDir(null) ?: context.filesDir, "neck_logs").apply { mkdirs() }
 
         private const val WINDOW_HEADER =
-            "start_ms,end_ms,screen_in_use,excluded,tilt_n,tilt_mean_deg,tilt_std_deg,linacc_n,linacc_mean,linacc_max"
+            "start_ms,end_ms,screen_in_use,excluded,tilt_n,tilt_mean_deg,tilt_std_deg,linacc_n,linacc_mean,linacc_max," +
+                "static_device,exclude_reason"
         private const val CYCLE_HEADER =
-            "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max"
+            "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max," +
+                "static_windows"
         private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 }

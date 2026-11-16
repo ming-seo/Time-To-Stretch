@@ -109,7 +109,7 @@ class NeckSensingService : Service(), SensorEventListener {
                 aggregator.addLinearAccMagnitude(sqrt((x * x + y * y + z * z).toDouble()))
             }
             Sensor.TYPE_PROXIMITY -> {
-                if (event.values[0] < event.sensor.maximumRange) aggregator.markExcluded()
+                if (event.values[0] < event.sensor.maximumRange) aggregator.markExcluded("proximity")
             }
         }
     }
@@ -120,7 +120,7 @@ class NeckSensingService : Service(), SensorEventListener {
         val tilt = TiltCalculator.tiltDegrees(gx, gy, gz)
         aggregator.addTilt(tilt)
         NeckLiveState.currentTilt = tilt
-        if (isInCall()) aggregator.markExcluded()
+        if (isInCall()) aggregator.markExcluded("call")
     }
 
     private fun closeWindow() {

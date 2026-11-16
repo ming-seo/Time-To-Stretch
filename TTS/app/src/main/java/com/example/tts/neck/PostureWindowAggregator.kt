@@ -11,6 +11,10 @@ data class WindowResult(
     val screenInUse: Boolean,
     /** A call or a covered proximity sensor was seen during the window. */
     val excluded: Boolean,
+    /** Why the window was excluded: "proximity", "call" (empty if not excluded). */
+    val excludeReasons: Set<String>,
+    /** Phone lay still (max linear acceleration below the static threshold), e.g. on a desk or stand. */
+    val staticDevice: Boolean,
     val tiltCount: Int,
     val tiltMean: Double?,
     val tiltStd: Double?,
@@ -18,7 +22,9 @@ data class WindowResult(
     val linAccMean: Double?,
     val linAccMax: Double?,
 ) {
-    val valid: Boolean get() = screenInUse && !excluded && tiltCount > 0
+    /** Would be valid if the phone had not been still. */
+    val usable: Boolean get() = screenInUse && !excluded && tiltCount > 0
+    val valid: Boolean get() = usable && !staticDevice
 }
 
 /** One 60-second cycle of 12 windows (SmartPose "notification cycle"). Stats use valid windows only. */
@@ -27,6 +33,8 @@ data class CycleResult(
     val endMs: Long,
     val windowCount: Int,
     val validWindowCount: Int,
+    /** Windows dropped only because the phone lay still. */
+    val staticWindowCount: Int,
     /** Mean of the valid windows' mean tilt (SmartPose CATA). */
     val cata: Double?,
     /** Standard deviation of the valid windows' mean tilt. */
@@ -39,11 +47,14 @@ data class CycleResult(
  * Collects tilt and linear-acceleration samples into 5-second windows and groups
  * every [windowsPerCycle] windows into a cycle. Pure logic, no Android dependencies.
  */
-class PostureWindowAggregator(private val windowsPerCycle: Int = 12) {
+class PostureWindowAggregator(
+    private val windowsPerCycle: Int = 12,
+    private val staticLinAccMax: Double = 0.3,
+) {
 
     private var windowStartMs = 0L
     private var inUseWholeWindow = false
-    private var excludedInWindow = false
+    private val excludeReasons = mutableSetOf<String>()
     private val tilt = RunningStats()
     private val linAcc = RunningStats()
     private var linAccMax = 0.0
@@ -52,7 +63,7 @@ class PostureWindowAggregator(private val windowsPerCycle: Int = 12) {
     fun startWindow(nowMs: Long, screenInUse: Boolean) {
         windowStartMs = nowMs
         inUseWholeWindow = screenInUse
-        excludedInWindow = false
+        excludeReasons.clear()
         tilt.clear()
         linAcc.clear()
         linAccMax = 0.0
@@ -62,8 +73,8 @@ class PostureWindowAggregator(private val windowsPerCycle: Int = 12) {
         if (!screenInUse) inUseWholeWindow = false
     }
 
-    fun markExcluded() {
-        excludedInWindow = true
+    fun markExcluded(reason: String) {
+        excludeReasons += reason
     }
 
     fun addTilt(degrees: Double) = tilt.add(degrees)
@@ -79,7 +90,9 @@ class PostureWindowAggregator(private val windowsPerCycle: Int = 12) {
             startMs = windowStartMs,
             endMs = nowMs,
             screenInUse = inUseWholeWindow,
-            excluded = excludedInWindow,
+            excluded = excludeReasons.isNotEmpty(),
+            excludeReasons = excludeReasons.toSet(),
+            staticDevice = linAcc.count > 0 && linAccMax < staticLinAccMax,
             tiltCount = tilt.count,
             tiltMean = tilt.meanOrNull(),
             tiltStd = tilt.stdOrNull(),
@@ -112,6 +125,7 @@ class PostureWindowAggregator(private val windowsPerCycle: Int = 12) {
             endMs = windows.last().endMs,
             windowCount = windows.size,
             validWindowCount = valid.size,
+            staticWindowCount = windows.count { it.usable && it.staticDevice },
             cata = tiltMeans.meanOrNull(),
             tiltStd = tiltMeans.stdOrNull(),
             linAccMean = if (withLinAcc.isEmpty()) null else withLinAcc.map { it.linAccMean!! }.average(),
