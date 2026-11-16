@@ -83,7 +83,7 @@ Lee, Choi, Lee, Shim. *Smart Pose: Mobile Posture-aware System for Lowering Phys
 | --- | --- | --- |
 | 5초/60초 주기, CATA | ✅ | 그대로 |
 | 폰 기울기 | ⚠️ 수정 | `TYPE_ORIENTATION` deprecated → `TYPE_GRAVITY` 로 `θ = atan2(g_z, √(g_x²+g_y²))`. 세로·가로 구분 불필요 |
-| 흔들림(거치대 배제) | ✅ | `TYPE_LINEAR_ACCELERATION` 임계 초과 횟수 |
+| 흔들림(거치대 배제) | ✅ | `TYPE_LINEAR_ACCELERATION` 크기의 5초 최대값 < 임계면 정지(거치대·책상) 구간 |
 | 얼굴 검출로 "사용 중" 판정 | ❌ 백그라운드 카메라 불가 | 화면 켜짐 + 잠금 해제 + 통화·근접 제외로 대체 |
 | 백그라운드 센서 | ⚠️ | Android 9+ 백그라운드 앱은 연속 센서 수신 불가 → **포그라운드 서비스(type `health`)**. `FOREGROUND_SERVICE_HEALTH` + 기존 `ACTIVITY_RECOGNITION` 권한으로 요건 충족 |
 | 임계값 56–75° | ⚠️ | 기본값으로만 사용, 모드 B 결과로 사용자별 보정(§4.5) |
@@ -139,19 +139,19 @@ NeckMonitorService (포그라운드 서비스, type=health) ── 모드 A ─�
 
 **기울기**: `θ_phone = atan2(g_z, √(g_x² + g_y²))` [°]. 수직 0°, 화면이 위로 평평 90°, 화면이 아래를 향하면 음수.
 
-**5초 윈도우**: `screenInUse`(화면 켜짐 && 잠금 해제), `excluded`(통화 중, 근접센서 가림), `θ` 평균·표준편차, 흔들림 횟수.
+**5초 윈도우**: `screenInUse`(화면 켜짐 && 잠금 해제), `excluded`(통화 중, 근접센서 가림 — 사유 기록), `θ` 평균·표준편차, 선형가속도 크기 평균·최대. 선형가속도 최대 < `T_static`(0.15 m/s²)이면 `static`(거치대·책상) 구간으로 보고 CATA 계산에서 뺀다. 유효 윈도우 = 사용 중 && 제외 아님 && 정지 아님.
 
 **60초 사이클 상태**
 
 | 조건 | 상태 |
 | --- | --- |
-| 유효 윈도우 < `N_valid_min`(6) | `NOT_IN_USE` |
-| 흔들림 합 < `T_shake_cycle` | `STATIC_DEVICE` (거치대·책상) |
+| 유효 윈도우 < `N_valid_min`(6), 정지 구간을 빼서 6 미만이 된 경우 | `STATIC_DEVICE` (거치대·책상) |
+| 유효 윈도우 < `N_valid_min`(6), 그 외 | `NOT_IN_USE` |
 | CATA < 0° | `SUPINE_LIKE` (A1 위반, 제외) |
 | `g(CATA)` ≥ 단계 경계 | `BENT_MILD` / `BENT` / `BENT_SEVERE` (§2.1 단계) |
 | 그 외 | `UPRIGHT` |
 
-`g()` 가 아직 없으면(캘리브레이션 전) SmartPose 기본 임계 56° 하나로 `BENT` / `UPRIGHT` 만 판정한다.
+`g()` 가 아직 없으면(캘리브레이션 전) SmartPose 기본 임계 56° 하나로 `BENT` / `UPRIGHT` 만 판정한다. **현재 구현(P1)은 이 방식이다** (`NeckDebtCalculator`).
 
 ### 4.3 모드 B 파이프라인 (Watanabe)
 
@@ -185,9 +185,10 @@ BENT_*      : D_n += w(g(CATA))          # w: Hansraj 하중비. 15°→12/5, 30
 UPRIGHT     : D_n  = max(0, D_n − r_upright)
 NOT_IN_USE  : D_n  = max(0, D_n − r_rest)
 STATIC_DEVICE, SUPINE_LIKE, SIDE_LYING_LIKE : 변화 없음 (로그만)
+(현재 구현, g() 없음) BENT : D_n += 1
 스트레칭 완료 : D_n = D_n × (1 − k_stretch)
 ```
-초기값 `r_upright = 0.25`, `r_rest = 0.5`, `k_stretch = 0.5` (파일럿 후 조정).
+초기값 `r_upright = 0.25`, `r_rest = 0.5`, `k_stretch = 0.5` (파일럿 후 조정). `D_n` 은 SharedPreferences 에 저장해 측정을 껐다 켜도 이어진다. 스트레칭 완료 항목은 아직 미구현.
 
 ### 4.7 파라미터 (`NeckConfig` 한 곳에서 관리)
 
@@ -196,7 +197,7 @@ STATIC_DEVICE, SUPINE_LIKE, SIDE_LYING_LIKE : 변화 없음 (로그만)
 | 윈도우 / 사이클 | 5 s / 60 s | SmartPose | 고정 |
 | `N_valid_min` | 6/12 | 30 s 이상 사용 | E2 |
 | 기본 숙임 임계 (g 없을 때) | CATA 56° | SmartPose | E1 |
-| `T_shake`, `T_shake_cycle` | 미정 | 논문 미공개 | E2 |
+| `T_static` (5초 선형가속도 최대) | 0.15 m/s² | Galaxy S9 로그: 책상 ≤ 0.14, 손에 들고 정지 ≥ 0.12 (대부분 ≥ 0.15). 0.3 에서는 손에 든 정지 구간이 STATIC_DEVICE 로 판정됨 (2026-11-16) | 다른 기기 확인 필요 |
 | 단계 경계 | 15° / 30° / 45° (θ_neck) | §2.1 | 파일럿 |
 | 모드 B 프레임 | 5–10 fps | 연산량 | E3 |
 | 키포인트 신뢰도 | 코·눈 0.7, 어깨 `inFrameLikelihood` 0.5 | 논문(OpenPose 기준) → ML Kit 로 재조정 | E0 |
@@ -212,7 +213,8 @@ STATIC_DEVICE, SUPINE_LIKE, SIDE_LYING_LIKE : 변화 없음 (로그만)
 | 의존성 추가 | CameraX, ML Kit Face Detection, ML Kit Pose Detection, ONNX Runtime Android |
 
 ### 4.9 로그
-- `cycles_yyyy-MM-dd.csv` (모드 A, 1분 1행): `start_ms, valid_windows, cata, theta_std, shake_total, state, g_cata, g_sigma, activity, d_n`
+- `windows_yyyy-MM-dd.csv` (모드 A, 5초 1행, 현재 구현): `start_ms, end_ms, screen_in_use, excluded, tilt_n, tilt_mean_deg, tilt_std_deg, linacc_n, linacc_mean, linacc_max, static_device, exclude_reason`
+- `cycles_yyyy-MM-dd.csv` (모드 A, 1분 1행, 현재 구현): `start_ms, end_ms, windows, valid_windows, cata_deg, tilt_std_deg, linacc_mean, linacc_max, static_windows, state, d_n` (`g_cata`, `g_sigma`, `activity` 는 g() 구현 후 추가)
 - `frames_<session>.csv` (모드 B, 프레임 1행): `ts_ms, theta_phone, phone_roll, face_pitch, face_yaw, face_roll, nose_xy, eyeL_xy, eyeR_xy, shL_xy, shR_xy, sh_likelihood, ratio, theta_neck_pred, drop_reason`
 - 데이터 수집 모드에서는 `frames_*.csv` 에 원본 특징만 기록(모델 없이)하고, 정답과 합쳐 학습에 쓴다.
 
@@ -251,7 +253,7 @@ STATIC_DEVICE, SUPINE_LIKE, SIDE_LYING_LIKE : 변화 없음 (로그만)
 | --- | --- | --- | --- |
 | **E0** 키포인트 검출률 (Go/No-go) | 모드 B 성립 여부 | 팀원 2명, 서기·앉기 × 폰 기울기 0/30/60/80° × 거리 25/35/45 cm, 각 20초 | 숙임 자세(θ_phone 30–60°)에서 **어깨 양쪽 검출 ≥ 60% 프레임**이면 Go. 미달 시 §3.3 대안 |
 | **E1** 모드 A 기울기–목 각도 관계 | SmartPose 가설 재검증, 기본 임계 결정 | §5 데이터의 θ_phone 과 정답 θ_neck | r, 회귀식, 숙임 판정 F1 |
-| **E2** 사용 상태 게이트 | 거치대·책상·주머니·화면 꺼짐 배제, `T_shake` 결정 | 상황별 5분 | 상태 분류 정확도 |
+| **E2** 사용 상태 게이트 | 거치대·책상·주머니·화면 꺼짐 배제, `T_static` 결정 | 상황별 5분 | 상태 분류 정확도 |
 | **E3** 성능·배터리 | 모드 A 상시 비용, 모드 B 처리 속도 | 화면 켜고 1시간(서비스 on/off), 모드 B 10분 | 배터리 % 차이, 프레임당 ms |
 | **E4** 모드 B 정확도 | Watanabe 재현 수준 확인 | §5.4 | MAE ≤ 10°(목표), 논문 수치와 비교 |
 | **E5** 보정 `g()` 효과 | 모드 A 정확도 개선 여부 | 같은 참가자의 모드 B 쌍으로 `g()` 학습 → 별도 세션의 모드 A 에 적용 | g 적용 전후 MAE / 판정 F1 |
