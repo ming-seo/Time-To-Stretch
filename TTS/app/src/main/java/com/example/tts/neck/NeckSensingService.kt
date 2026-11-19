@@ -44,6 +44,7 @@ class NeckSensingService : Service(), SensorEventListener {
     private var screenInUse = false
     private lateinit var sampler: NeckCameraSampler
     private var lastSampleAttemptMs = 0L
+    private var mapping = NeckMapping()
 
     // Low-pass filtered accelerometer, used only when TYPE_GRAVITY is unavailable.
     private val fallbackGravity = FloatArray(3)
@@ -70,6 +71,7 @@ class NeckSensingService : Service(), SensorEventListener {
         logger = NeckCsvLogger(this)
         sampler = NeckCameraSampler(this, phoneTilt = { NeckLiveState.currentTilt })
         debt = prefs().getFloat(NeckDebtCalculator.KEY_DEBT, 0f).toDouble()
+        mapping = NeckMapping.load(prefs())
 
         startInForeground()
 
@@ -154,6 +156,10 @@ class NeckSensingService : Service(), SensorEventListener {
         sampler.start { sample ->
             logger.logSample(sample)
             NeckLiveState.lastSample = sample
+            if (sample.ok) {
+                mapping = mapping.add(sample.phoneTilt!!, sample.neckDeg!!)
+                mapping.save(prefs())
+            }
         }
     }
 
