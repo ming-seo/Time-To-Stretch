@@ -108,7 +108,7 @@
 | CATA ≥ 56° (SmartPose 기본 임계) | `BENT` | +1 |
 | 그 외 | `UPRIGHT` | −0.25 (최소 0) |
 
-### 3.7 누운 자세 세분화 (`feature/lying-posture-states`)
+### 3.7 누운 자세 세분화
 
 | 커밋 | 내용 |
 | --- | --- |
