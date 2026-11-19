@@ -37,7 +37,8 @@ class NeckActivity : AppCompatActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
-        if (results.values.all { it }) {
+        // CAMERA is optional: without it mode A still runs and the camera bursts are logged as no_permission.
+        if (results.filterKeys { it != Manifest.permission.CAMERA }.values.all { it }) {
             startSensing()
         } else {
             Toast.makeText(this, "측정에 필요한 권한이 없습니다", Toast.LENGTH_LONG).show()
@@ -80,7 +81,10 @@ class NeckActivity : AppCompatActivity() {
         val missing = requiredPermissions().filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        if (missing.isEmpty()) startSensing() else permissionLauncher.launch(missing.toTypedArray())
+        val request = missing + listOf(Manifest.permission.CAMERA).filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (request.isEmpty()) startSensing() else permissionLauncher.launch(request.toTypedArray())
     }
 
     /** ACTIVITY_RECOGNITION is required for a health-type foreground service on Android 14+. */

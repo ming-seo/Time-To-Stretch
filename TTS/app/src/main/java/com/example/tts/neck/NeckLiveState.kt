@@ -8,4 +8,7 @@ object NeckLiveState {
     var lastCycle: CycleResult? = null
     var lastState: NeckState? = null
     var logDir: String? = null
+    var lastSample: FaceSample? = null
+    /** The mode B collection screen holds the front camera; the service skips its camera bursts meanwhile. */
+    var collectScreenOpen = false
 }

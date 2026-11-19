@@ -42,6 +42,8 @@ class NeckSensingService : Service(), SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
     private var sensorsRegistered = false
     private var screenInUse = false
+    private lateinit var sampler: NeckCameraSampler
+    private var lastSampleAttemptMs = 0L
 
     // Low-pass filtered accelerometer, used only when TYPE_GRAVITY is unavailable.
     private val fallbackGravity = FloatArray(3)
@@ -66,6 +68,7 @@ class NeckSensingService : Service(), SensorEventListener {
         keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         logger = NeckCsvLogger(this)
+        sampler = NeckCameraSampler(this, phoneTilt = { NeckLiveState.currentTilt })
         debt = prefs().getFloat(NeckDebtCalculator.KEY_DEBT, 0f).toDouble()
 
         startInForeground()
@@ -90,6 +93,7 @@ class NeckSensingService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         handler.removeCallbacks(windowTick)
+        sampler.release()
         unregisterReceiver(screenReceiver)
         unregisterSensors()
         aggregator.reset()
@@ -130,6 +134,7 @@ class NeckSensingService : Service(), SensorEventListener {
         updateScreenInUse()
         val (window, cycle) = aggregator.closeWindow(System.currentTimeMillis(), screenInUse)
         logger.logWindow(window)
+        maybeStartSample(window)
         if (cycle != null) {
             val state = debtCalculator.judge(cycle)
             debt = debtCalculator.update(debt, state)
@@ -137,6 +142,18 @@ class NeckSensingService : Service(), SensorEventListener {
             logger.logCycle(cycle, state, debt)
             NeckLiveState.lastCycle = cycle
             NeckLiveState.lastState = state
+        }
+    }
+
+    /** Starts a camera burst every [SAMPLE_INTERVAL_MS] when the window just closed was valid (phone in hand, in use). */
+    private fun maybeStartSample(window: WindowResult) {
+        val now = System.currentTimeMillis()
+        if (!window.valid || sampler.busy || NeckLiveState.collectScreenOpen) return
+        if (now - lastSampleAttemptMs < SAMPLE_INTERVAL_MS) return
+        lastSampleAttemptMs = now
+        sampler.start { sample ->
+            logger.logSample(sample)
+            NeckLiveState.lastSample = sample
         }
     }
 
@@ -149,6 +166,7 @@ class NeckSensingService : Service(), SensorEventListener {
         if (inUse) {
             registerSensors()
         } else {
+            sampler.cancel()
             unregisterSensors()
             NeckLiveState.currentTilt = null
         }
@@ -197,6 +215,7 @@ class NeckSensingService : Service(), SensorEventListener {
 
     companion object {
         private const val WINDOW_MS = 5_000L
+        private const val SAMPLE_INTERVAL_MS = 120_000L
         private const val LOW_PASS_ALPHA = 0.8f
         private const val CHANNEL_ID = "neck_sensing"
         private const val NOTIFICATION_ID = 2001

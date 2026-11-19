@@ -37,6 +37,16 @@ class NeckCsvLogger(context: Context) {
         c.startMs,
     )
 
+    fun logSample(s: FaceSample) = append(
+        "samples",
+        SAMPLE_HEADER,
+        listOf(
+            s.startMs, s.endMs, s.frames, s.faceFrames, s.validFrames,
+            fmt(s.phoneTilt), fmt(s.neckDeg), fmt(s.facePitch), s.failReason ?: "",
+        ).joinToString(","),
+        s.startMs,
+    )
+
     private fun append(prefix: String, header: String, line: String, timeMs: Long) {
         val file = File(dir, "${prefix}_${DATE_FORMAT.format(Date(timeMs))}.csv")
         val isNew = !file.exists()
@@ -55,6 +65,8 @@ class NeckCsvLogger(context: Context) {
         private const val CYCLE_HEADER =
             "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max," +
                 "static_windows,state,d_n"
+        private const val SAMPLE_HEADER =
+            "start_ms,end_ms,frames,face_frames,valid_frames,theta_phone_deg,theta_neck_deg,face_pitch_deg,fail_reason"
         private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 }

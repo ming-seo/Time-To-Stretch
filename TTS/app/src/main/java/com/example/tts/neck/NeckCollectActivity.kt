@@ -114,12 +114,14 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
+        NeckLiveState.collectScreenOpen = true
         (sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY) ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER))
             ?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
     }
 
     override fun onPause() {
         super.onPause()
+        NeckLiveState.collectScreenOpen = false
         sensorManager.unregisterListener(this)
         stopRecording()
         calibrationEndMs = null
