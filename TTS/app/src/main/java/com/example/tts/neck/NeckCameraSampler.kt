@@ -40,6 +40,8 @@ data class FaceSample(
     val phoneTilt: Double?,
     val neckDeg: Double?,
     val facePitch: Double?,
+    /** Population standard deviation of the per-frame neck angles (°); spread of the estimate within the burst. */
+    val neckStd: Double?,
     /** null on success; otherwise no_permission, no_model, no_norm_ref, camera_error, too_few_frames, cancelled. */
     val failReason: String?,
 ) {
@@ -105,7 +107,7 @@ class NeckCameraSampler(
             else -> null
         }
         if (precondition != null) {
-            onDone(FaceSample(now, now, 0, 0, 0, null, null, null, precondition))
+            onDone(FaceSample(now, now, 0, 0, 0, null, null, null, null, precondition))
             return
         }
         val b = Burst(now, normRef!!, onDone)
@@ -204,6 +206,7 @@ class NeckCameraSampler(
                 phoneTilt = if (reason == null) median(b.tilts) else null,
                 neckDeg = if (reason == null) median(b.necks) else null,
                 facePitch = if (reason == null) median(b.pitches) else null,
+                neckStd = if (reason == null) std(b.necks) else null,
                 failReason = reason,
             )
         )
@@ -223,6 +226,11 @@ class NeckCameraSampler(
         if (values.isEmpty()) return null
         val s = values.sorted()
         return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
+    }
+
+    private fun std(values: List<Double>): Double {
+        val mean = values.average()
+        return kotlin.math.sqrt(values.sumOf { (it - mean) * (it - mean) } / values.size)
     }
 
     companion object {

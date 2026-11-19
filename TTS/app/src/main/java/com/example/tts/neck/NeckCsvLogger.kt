@@ -43,7 +43,7 @@ class NeckCsvLogger(context: Context) {
         SAMPLE_HEADER,
         listOf(
             s.startMs, s.endMs, s.frames, s.faceFrames, s.validFrames,
-            fmt(s.phoneTilt), fmt(s.neckDeg), fmt(s.facePitch), s.failReason ?: "",
+            fmt(s.phoneTilt), fmt(s.neckDeg), fmt(s.facePitch), s.failReason ?: "", fmt(s.neckStd),
         ).joinToString(","),
         s.startMs,
     )
@@ -67,7 +67,7 @@ class NeckCsvLogger(context: Context) {
             "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max," +
                 "static_windows,state,d_n,g_cata_deg,g_sigma_deg"
         private const val SAMPLE_HEADER =
-            "start_ms,end_ms,frames,face_frames,valid_frames,theta_phone_deg,theta_neck_deg,face_pitch_deg,fail_reason"
+            "start_ms,end_ms,frames,face_frames,valid_frames,theta_phone_deg,theta_neck_deg,face_pitch_deg,fail_reason,theta_neck_std_deg"
         private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 }
