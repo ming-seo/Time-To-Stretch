@@ -157,10 +157,13 @@ class NeckSensingService : Service(), SensorEventListener {
         }
     }
 
-    /** Starts a camera burst every [SAMPLE_INTERVAL_MS] when the window just closed was valid (phone in hand, in use). */
+    /**
+     * Starts a camera burst every [SAMPLE_INTERVAL_MS] when the window just closed was valid (phone in hand, in use)
+     * and TRUNK_UPRIGHT, so that g() is fitted only from sitting/standing pairs.
+     */
     private fun maybeStartSample(window: WindowResult) {
         val now = System.currentTimeMillis()
-        if (!window.valid || sampler.busy || NeckLiveState.collectScreenOpen) return
+        if (!window.valid || window.posture != WindowPosture.TRUNK_UPRIGHT || sampler.busy || NeckLiveState.collectScreenOpen) return
         if (now - lastSampleAttemptMs < SAMPLE_INTERVAL_MS) return
         lastSampleAttemptMs = now
         sampler.start { sample ->
