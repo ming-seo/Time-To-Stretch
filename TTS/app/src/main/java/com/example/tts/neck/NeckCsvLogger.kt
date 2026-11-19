@@ -26,13 +26,14 @@ class NeckCsvLogger(context: Context) {
         w.startMs,
     )
 
-    fun logCycle(c: CycleResult, state: NeckState, debt: Double) = append(
+    /** [gCata] is g(CATA) and [gSigma] the residual std of g(); both empty while g() is not ready. */
+    fun logCycle(c: CycleResult, state: NeckState, debt: Double, gCata: Double?, gSigma: Double?) = append(
         "cycles",
         CYCLE_HEADER,
         listOf(
             c.startMs, c.endMs, c.windowCount, c.validWindowCount,
             fmt(c.cata), fmt(c.tiltStd), fmt(c.linAccMean), fmt(c.linAccMax),
-            c.staticWindowCount, state, fmt(debt),
+            c.staticWindowCount, state, fmt(debt), fmt(gCata), fmt(gSigma),
         ).joinToString(","),
         c.startMs,
     )
@@ -64,7 +65,7 @@ class NeckCsvLogger(context: Context) {
                 "static_device,exclude_reason"
         private const val CYCLE_HEADER =
             "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max," +
-                "static_windows,state,d_n"
+                "static_windows,state,d_n,g_cata_deg,g_sigma_deg"
         private const val SAMPLE_HEADER =
             "start_ms,end_ms,frames,face_frames,valid_frames,theta_phone_deg,theta_neck_deg,face_pitch_deg,fail_reason"
         private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)

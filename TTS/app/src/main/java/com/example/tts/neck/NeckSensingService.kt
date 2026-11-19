@@ -138,10 +138,11 @@ class NeckSensingService : Service(), SensorEventListener {
         logger.logWindow(window)
         maybeStartSample(window)
         if (cycle != null) {
-            val state = debtCalculator.judge(cycle)
-            debt = debtCalculator.update(debt, state)
+            val gCata = cycle.cata?.let { mapping.predict(it) }
+            val state = debtCalculator.judge(cycle, gCata)
+            debt = debtCalculator.update(debt, state, gCata)
             prefs().edit().putFloat(NeckDebtCalculator.KEY_DEBT, debt.toFloat()).apply()
-            logger.logCycle(cycle, state, debt)
+            logger.logCycle(cycle, state, debt, gCata, if (gCata != null) mapping.residualStd else null)
             NeckLiveState.lastCycle = cycle
             NeckLiveState.lastState = state
         }
