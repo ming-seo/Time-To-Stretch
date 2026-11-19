@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.hardware.display.DisplayManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -20,6 +21,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.view.Display
 import androidx.core.app.NotificationCompat
 import kotlin.math.sqrt
 
@@ -34,6 +36,7 @@ class NeckSensingService : Service(), SensorEventListener {
     private lateinit var powerManager: PowerManager
     private lateinit var keyguardManager: KeyguardManager
     private lateinit var audioManager: AudioManager
+    private var defaultDisplay: Display? = null
     private lateinit var logger: NeckCsvLogger
 
     private val aggregator = PostureWindowAggregator()
@@ -69,6 +72,7 @@ class NeckSensingService : Service(), SensorEventListener {
         powerManager = getSystemService(POWER_SERVICE) as PowerManager
         keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        defaultDisplay = (getSystemService(DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
         logger = NeckCsvLogger(this)
         sampler = NeckCameraSampler(this, phoneTilt = { NeckLiveState.currentTilt })
         debt = prefs().getFloat(NeckDebtCalculator.KEY_DEBT, 0f).toDouble()
@@ -129,6 +133,9 @@ class NeckSensingService : Service(), SensorEventListener {
     private fun onGravity(gx: Float, gy: Float, gz: Float) {
         val tilt = TiltCalculator.tiltDegrees(gx, gy, gz)
         aggregator.addTilt(tilt)
+        val rotation = defaultDisplay?.rotation ?: 0
+        val (cx, cy) = TiltCalculator.toContentFrame(gx, gy, rotation)
+        aggregator.addContentGravity(cx, cy, rotation)
         NeckLiveState.currentTilt = tilt
         if (isInCall()) aggregator.markExcluded("call")
     }

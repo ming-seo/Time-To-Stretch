@@ -22,6 +22,7 @@ class NeckCsvLogger(context: Context) {
             w.tiltCount, fmt(w.tiltMean), fmt(w.tiltStd),
             w.linAccCount, fmt(w.linAccMean), fmt(w.linAccMax),
             w.staticDevice, w.excludeReasons.sorted().joinToString("|"),
+            fmt(w.contentRoll), w.displayRotation ?: "",
         ).joinToString(","),
         w.startMs,
     )
@@ -72,7 +73,7 @@ class NeckCsvLogger(context: Context) {
 
         private const val WINDOW_HEADER =
             "start_ms,end_ms,screen_in_use,excluded,tilt_n,tilt_mean_deg,tilt_std_deg,linacc_n,linacc_mean,linacc_max," +
-                "static_device,exclude_reason"
+                "static_device,exclude_reason,content_roll_deg,display_rotation_deg"
         private const val CYCLE_HEADER =
             "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max," +
                 "static_windows,state,d_n,g_cata_deg,g_sigma_deg,neck_deg,neck_src"

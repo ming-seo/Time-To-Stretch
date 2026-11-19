@@ -1,6 +1,8 @@
 package com.example.tts.neck
 
 import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -16,4 +18,16 @@ object TiltCalculator {
 
     /** Screen rotation about its normal: 0° = upright portrait, ±90° = landscape. Unstable when the phone is flat. */
     fun rollDegrees(gx: Float, gy: Float): Double = Math.toDegrees(atan2(gx.toDouble(), gy.toDouble()))
+
+    /**
+     * In-plane gravity (gx, gy) expressed in the displayed content's frame (x = content right, y = content up),
+     * given the display rotation in quarter turns (Surface.ROTATION_0..3). atan2(x, y) of the result is the
+     * content roll: 0° = content upright with respect to gravity, ±90° = content lying sideways (e.g. side-lying).
+     */
+    fun toContentFrame(gx: Float, gy: Float, rotation: Int): Pair<Double, Double> {
+        val theta = Math.toRadians(rotation * 90.0)
+        val c = cos(theta)
+        val s = sin(theta)
+        return (gx * c - gy * s) to (gx * s + gy * c)
+    }
 }

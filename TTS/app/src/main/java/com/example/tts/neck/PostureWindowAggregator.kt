@@ -1,5 +1,6 @@
 package com.example.tts.neck
 
+import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -21,6 +22,10 @@ data class WindowResult(
     val linAccCount: Int,
     val linAccMean: Double?,
     val linAccMax: Double?,
+    /** Content roll (°) from the window's vector-mean in-plane gravity; null without gravity samples. */
+    val contentRoll: Double? = null,
+    /** Display rotation (°: 0/90/180/270) at the window's last gravity sample; null without samples. */
+    val displayRotation: Int? = null,
 ) {
     /** Would be valid if the phone had not been still. */
     val usable: Boolean get() = screenInUse && !excluded && tiltCount > 0
@@ -58,6 +63,10 @@ class PostureWindowAggregator(
     private val tilt = RunningStats()
     private val linAcc = RunningStats()
     private var linAccMax = 0.0
+    private var contentGravityCount = 0
+    private var contentGravityX = 0.0
+    private var contentGravityY = 0.0
+    private var displayRotation = 0
     private val cycleWindows = mutableListOf<WindowResult>()
 
     fun startWindow(nowMs: Long, screenInUse: Boolean) {
@@ -67,6 +76,9 @@ class PostureWindowAggregator(
         tilt.clear()
         linAcc.clear()
         linAccMax = 0.0
+        contentGravityCount = 0
+        contentGravityX = 0.0
+        contentGravityY = 0.0
     }
 
     fun onScreenInUseChanged(screenInUse: Boolean) {
@@ -78,6 +90,14 @@ class PostureWindowAggregator(
     }
 
     fun addTilt(degrees: Double) = tilt.add(degrees)
+
+    /** In-plane gravity in the content frame ([TiltCalculator.toContentFrame]) and the display rotation in quarter turns. */
+    fun addContentGravity(x: Double, y: Double, rotation: Int) {
+        contentGravityCount++
+        contentGravityX += x
+        contentGravityY += y
+        displayRotation = rotation
+    }
 
     fun addLinearAccMagnitude(magnitude: Double) {
         linAcc.add(magnitude)
@@ -99,6 +119,8 @@ class PostureWindowAggregator(
             linAccCount = linAcc.count,
             linAccMean = linAcc.meanOrNull(),
             linAccMax = if (linAcc.count > 0) linAccMax else null,
+            contentRoll = if (contentGravityCount > 0) Math.toDegrees(atan2(contentGravityX, contentGravityY)) else null,
+            displayRotation = if (contentGravityCount > 0) displayRotation * 90 else null,
         )
         cycleWindows += window
 
