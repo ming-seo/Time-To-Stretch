@@ -108,6 +108,18 @@
 | CATA ≥ 56° (SmartPose 기본 임계) | `BENT` | +1 |
 | 그 외 | `UPRIGHT` | −0.25 (최소 0) |
 
+### 3.7 누운 자세 세분화 (`feature/lying-posture-states`)
+
+| 커밋 | 내용 |
+| --- | --- |
+| `c279a8d` | 윈도우마다 **콘텐츠 roll**(화면 내용의 위쪽과 중력 위쪽 사이 각)과 화면 회전을 기록. 윈도우 CSV에 `content_roll_deg`, `display_rotation_deg` 열 추가 |
+| `9ff4b53` | 유효 윈도우를 `TRUNK_UPRIGHT` / `SUPINE` / `SIDE_LYING`으로 라벨링. 사이클의 절반 이상이 누운 윈도우면 `SUPINE_LIKE` / `SIDE_LYING_LIKE`(`D_n` 변화 없음), 아니면 `TRUNK_UPRIGHT` 윈도우로만 CATA 계산. 기존 `CATA < 0° → SUPINE_LIKE` 규칙은 제거. 윈도우 CSV에 `posture`, 사이클 CSV에 `supine_windows`, `side_lying_windows` 열 추가 |
+| `4573981` | 카메라 측정을 `TRUNK_UPRIGHT` 윈도우에서만 시작 (`g()` 학습 쌍에서 누운 자세 제외) |
+
+- 임계값(θ < −15°, \|θ\| ≤ 60° && \|콘텐츠 roll\| 60–120°, 절반)은 **초기값**이다. S9에서 자세별 로그를 받아 조정한다.
+- 엎드림(`PRONE_LIKE`)은 보류: 앉아서 많이 숙인 자세와 폰 기울기가 겹친다. 로그를 본 뒤 추가 여부를 정한다.
+- 기대어 누움은 바른 자세와 구분할 수 없어서 `UPRIGHT`로 판정된다.
+
 ---
 
 ## 4. 파라미터 조정 기록
@@ -187,4 +199,5 @@ python tools/convert_watanabe_model.py extra_trees.onnx TTS/app/src/main/assets/
 - [ ] P2: ArUco 마커 정답 파이프라인(Python), 데이터 수집, E1·E2
 - [ ] P3: 자체 모델 학습·평가(E4), 보정식 `g()`(E5), 숙임 단계 세분화(`BENT_MILD` / `BENT` / `BENT_SEVERE`)
 - [ ] P4: `feature/sedentary-detection`과 통합, `D = w_n·D_n + w_s·D_s`, 알림, E3·E6
-- [ ] 미구현 설계 항목: `SIDE_LYING_LIKE` 감지, 스트레칭 완료 시 `D_n` 감소, 모드 B 평활화(1초/3초 중앙값)
+- [ ] 누운 자세 임계값 조정: S9에서 자세별 로그(앉기 숙임/바름/가로 영상, 바로 누움, 기대어 누움, 옆으로 누움 좌·우 × 세로/가로, 엎드림) 수집 후 확정, `PRONE_LIKE` 추가 여부 결정
+- [ ] 미구현 설계 항목: 스트레칭 완료 시 `D_n` 감소, 모드 B 평활화(1초/3초 중앙값)

@@ -70,7 +70,7 @@ Lee, Choi, Lee, Shim. *Smart Pose: Mobile Posture-aware System for Lowering Phys
 | 구분 | 내용 |
 | --- | --- |
 | **가정 A1 (문제 2 보류)** | 몸통이 대략 수직(서기·앉기)이다. SmartPose·Watanabe·Lee 2015 모두 같은 전제(암묵적), Pose-on-the-Go(2021)는 명시적으로 같은 가정 |
-| A1 위반 감지 | 폰 기울기 < 0°(화면이 아래를 향함 → 누워서 위로 봄) → `SUPINE_LIKE`. 모드 B 에서 얼굴 roll > 45° 지속(옆으로 누움 추정) → `SIDE_LYING_LIKE`. 둘 다 측정 제외, 로그만 |
+| A1 위반 감지 | 5초 윈도우마다 판정(§4.2). 폰 기울기 < −15°(화면이 아래를 향함 → 누워서 위로 봄) → 바로 누움. 화면이 거의 수직(\|기울기\| ≤ 60°)인데 **콘텐츠 roll**(화면 내용의 위쪽과 중력 위쪽 사이 각)이 60–120° → 옆으로 누움. 사이클의 절반 이상이 누운 윈도우면 `SUPINE_LIKE` / `SIDE_LYING_LIKE`. 둘 다 측정 제외, 로그만. 얼굴 roll 은 쓰지 않는다: 옆으로 누운 사용자는 폰을 얼굴에 맞춰 들어서 이미지 속 얼굴 roll 은 ≈ 0° 이다. 엎드림은 앉아서 숙인 자세와 폰 기울기가 겹쳐서 보류(로그 확인 후 결정). 기대어 누움은 바른 자세와 구분 불가 (2026-11-19) |
 | 범위 밖 | 몸통 기울기 연속 추정, 몸통 대비 경추 굴곡, 머리 전방 이동(CVA), 폰이 눈높이보다 높은 경우, 백그라운드 카메라 측정, 목 신전(위로 젖힘, θ_neck < 0°) → §10 |
 
 ---
@@ -141,13 +141,23 @@ NeckMonitorService (포그라운드 서비스, type=health) ── 모드 A ─�
 
 **5초 윈도우**: `screenInUse`(화면 켜짐 && 잠금 해제), `excluded`(통화 중, 근접센서 가림 — 사유 기록), `θ` 평균·표준편차, 선형가속도 크기 평균·최대. 선형가속도 최대 < `T_static`(0.15 m/s²)이면 `static`(거치대·책상) 구간으로 보고 CATA 계산에서 뺀다. 유효 윈도우 = 사용 중 && 제외 아님 && 정지 아님.
 
+**윈도우 자세** (유효 윈도우만): 콘텐츠 roll = 화면 평면의 중력 성분 (g_x, g_y) 를 화면 회전(`Display.rotation` × 90°)만큼 되돌린 뒤 5초 벡터 평균의 `atan2(x, y)`. 0° = 내용이 중력 기준으로 똑바름, ±90° = 옆으로 누움. 회전 잠금·자동 회전·가로 영상 모두 같은 기준이 된다.
+
+| 조건 | 윈도우 자세 |
+| --- | --- |
+| θ 평균 < −15° | `SUPINE` |
+| \|θ 평균\| ≤ 60° && \|콘텐츠 roll\| ∈ [60°, 120°] | `SIDE_LYING` |
+| 그 외 | `TRUNK_UPRIGHT` |
+
+CATA 는 `TRUNK_UPRIGHT` 윈도우로만 계산한다(누운 윈도우가 섞여 평균이 끌려가는 것을 막음). 모드 B 카메라 측정도 `TRUNK_UPRIGHT` 윈도우에서만 시작해 `g()` 학습 쌍에 누운 자세가 들어가지 않게 한다.
+
 **60초 사이클 상태**
 
 | 조건 | 상태 |
 | --- | --- |
 | 유효 윈도우 < `N_valid_min`(6), 정지 구간을 빼서 6 미만이 된 경우 | `STATIC_DEVICE` (거치대·책상) |
 | 유효 윈도우 < `N_valid_min`(6), 그 외 | `NOT_IN_USE` |
-| CATA < 0° | `SUPINE_LIKE` (A1 위반, 제외) |
+| `SUPINE` + `SIDE_LYING` 윈도우 ≥ 유효 윈도우의 절반 | 더 많은 쪽: `SUPINE_LIKE` / `SIDE_LYING_LIKE` (같으면 `SUPINE_LIKE`). A1 위반, 제외 |
 | `g(CATA)` ≥ 단계 경계 | `BENT_MILD` / `BENT` / `BENT_SEVERE` (§2.1 단계) |
 | 그 외 | `UPRIGHT` |
 
@@ -197,6 +207,9 @@ STATIC_DEVICE, SUPINE_LIKE, SIDE_LYING_LIKE : 변화 없음 (로그만)
 | 윈도우 / 사이클 | 5 s / 60 s | SmartPose | 고정 |
 | `N_valid_min` | 6/12 | 30 s 이상 사용 | E2 |
 | 기본 숙임 임계 (g 없을 때) | CATA 56° | SmartPose | E1 |
+| 바로 누움 기울기 | θ < −15° | 0° 부근은 눈높이 바른 자세와 겹침 (2026-11-19) | 로그로 조정 |
+| 옆으로 누움 | \|θ\| ≤ 60°, \|콘텐츠 roll\| 60–120° | 폰이 평평하면 roll 불안정 (2026-11-19) | 로그로 조정 |
+| 누운 사이클 비율 | 유효 윈도우의 ≥ 1/2 | 다수결 (2026-11-19) | 로그로 조정 |
 | `T_static` (5초 선형가속도 최대) | 0.15 m/s² | Galaxy S9 로그: 책상 ≤ 0.14, 손에 들고 정지 ≥ 0.12 (대부분 ≥ 0.15). 0.3 에서는 손에 든 정지 구간이 STATIC_DEVICE 로 판정됨 (2026-11-16) | 다른 기기 확인 필요 |
 | 단계 경계 | 15° / 30° / 45° (θ_neck) | §2.1 | 파일럿 |
 | 모드 B 프레임 | 5–10 fps | 연산량 | E3 |
@@ -213,8 +226,8 @@ STATIC_DEVICE, SUPINE_LIKE, SIDE_LYING_LIKE : 변화 없음 (로그만)
 | 의존성 추가 | CameraX, ML Kit Face Detection, ML Kit Pose Detection, ONNX Runtime Android |
 
 ### 4.9 로그
-- `windows_yyyy-MM-dd.csv` (모드 A, 5초 1행, 현재 구현): `start_ms, end_ms, screen_in_use, excluded, tilt_n, tilt_mean_deg, tilt_std_deg, linacc_n, linacc_mean, linacc_max, static_device, exclude_reason`
-- `cycles_yyyy-MM-dd.csv` (모드 A, 1분 1행, 현재 구현): `start_ms, end_ms, windows, valid_windows, cata_deg, tilt_std_deg, linacc_mean, linacc_max, static_windows, state, d_n` (`g_cata`, `g_sigma`, `activity` 는 g() 구현 후 추가)
+- `windows_yyyy-MM-dd.csv` (모드 A, 5초 1행, 현재 구현): `start_ms, end_ms, screen_in_use, excluded, tilt_n, tilt_mean_deg, tilt_std_deg, linacc_n, linacc_mean, linacc_max, static_device, exclude_reason, content_roll_deg, display_rotation_deg, posture`
+- `cycles_yyyy-MM-dd.csv` (모드 A, 1분 1행, 현재 구현): `start_ms, end_ms, windows, valid_windows, cata_deg, tilt_std_deg, linacc_mean, linacc_max, static_windows, state, d_n, g_cata_deg, g_sigma_deg, neck_deg, neck_src, supine_windows, side_lying_windows` (`activity` 는 추후)
 - `frames_<session>.csv` (모드 B, 프레임 1행): `ts_ms, theta_phone, phone_roll, face_pitch, face_yaw, face_roll, nose_xy, eyeL_xy, eyeR_xy, shL_xy, shR_xy, sh_likelihood, ratio, theta_neck_pred, drop_reason`
 - 데이터 수집 모드에서는 `frames_*.csv` 에 원본 특징만 기록(모델 없이)하고, 정답과 합쳐 학습에 쓴다.
 
