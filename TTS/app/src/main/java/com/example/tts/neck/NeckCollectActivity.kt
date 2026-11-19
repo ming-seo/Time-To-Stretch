@@ -2,7 +2,6 @@ package com.example.tts.neck
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.PointF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -29,15 +28,11 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.example.tts.R
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import com.google.mlkit.vision.face.FaceLandmark
-import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseDetector
-import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import com.google.android.gms.tasks.Tasks
 import java.io.File
@@ -47,7 +42,6 @@ import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.abs
-import kotlin.math.hypot
 
 /** Mode B data collection screen: front camera face/shoulder features + phone tilt, recorded to frame CSV. */
 class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
@@ -164,7 +158,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     private fun updateCalibration(tsMs: Long, gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?) {
         val endMs = calibrationEndMs ?: return
         val tilt = gravity?.let { TiltCalculator.tiltDegrees(it[0], it[1], it[2]) }
-        val ratio = rawRatio(face, shoulders)
+        val ratio = ModeBFeatures.rawRatio(face, shoulders)
         if (tilt != null && abs(tilt) <= CAL_MAX_TILT_DEG &&
             face != null && abs(face.pitch) <= CAL_MAX_PITCH_DEG &&
             shoulders != null && shoulders.leftLikelihood >= MIN_SHOULDER_LIKELIHOOD &&
@@ -191,14 +185,6 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         normRef = median
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putFloat(KEY_NORM_REF, median).apply()
         Toast.makeText(this, "Norm_ref ${fmt(median)} 저장 (${sorted.size}프레임)", Toast.LENGTH_LONG).show()
-    }
-
-    /** nose–neck distance / eye distance (image px), before dividing by Norm_ref. */
-    private fun rawRatio(face: FaceFeatures?, shoulders: ShoulderFeatures?): Float? {
-        val nose = face?.nose ?: return null
-        val eyeDist = face.eyeDistance() ?: return null
-        if (shoulders == null || eyeDist <= 0f) return null
-        return hypot(nose.x - shoulders.neck.x, nose.y - shoulders.neck.y) / eyeDist
     }
 
     override fun onDestroy() {
@@ -308,16 +294,10 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     }
 
     /** Neck angle (°) from the Watanabe model; null without model, Norm_ref, phone tilt, face or both shoulders. */
-    private fun predictNeck(gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?): Double? {
-        val model = neckModel ?: return null
-        val ref = normRef ?: return null
-        val g = gravity ?: return null
-        if (face == null || shoulders == null ||
-            shoulders.leftLikelihood < MIN_SHOULDER_LIKELIHOOD || shoulders.rightLikelihood < MIN_SHOULDER_LIKELIHOOD
-        ) return null
-        val ratio = rawRatio(face, shoulders) ?: return null
-        return model.predict((ratio / ref).toDouble(), TiltCalculator.tiltDegrees(g[0], g[1], g[2]), face.pitch.toDouble())
-    }
+    private fun predictNeck(gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?): Double? =
+        ModeBFeatures.predictNeck(
+            neckModel, normRef, gravity?.let { TiltCalculator.tiltDegrees(it[0], it[1], it[2]) }, face, shoulders,
+        )
 
     private fun showFeatures(
         face: FaceFeatures?,
@@ -342,7 +322,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
             "어깨: 없음"
         } else {
             "어깨 신뢰도 L ${fmt(shoulders.leftLikelihood)} · R ${fmt(shoulders.rightLikelihood)}\n" +
-                "코–목 / 눈 사이: ${rawRatio(face, shoulders)?.let { fmt(it) } ?: "-"}"
+                "코–목 / 눈 사이: ${ModeBFeatures.rawRatio(face, shoulders)?.let { fmt(it) } ?: "-"}"
         }
         tvFeatures.text = faceText + "\n" + shoulderText + "\nNorm_ref: ${normRef?.let { fmt(it) } ?: "미설정"}" +
             "\n목 각도: " + when {
@@ -354,56 +334,14 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
     private fun fmt(v: Float): String = String.format(Locale.US, "%.2f", v)
 
-    /** Face features for mode B: head pose relative to the camera and nose/eye positions (image px). */
-    private data class FaceFeatures(
-        val pitch: Float,
-        val yaw: Float,
-        val roll: Float,
-        val nose: PointF?,
-        val leftEye: PointF?,
-        val rightEye: PointF?,
-    ) {
-        fun eyeDistance(): Float? =
-            if (leftEye != null && rightEye != null) hypot(leftEye.x - rightEye.x, leftEye.y - rightEye.y) else null
-
-        companion object {
-            fun from(face: Face) = FaceFeatures(
-                pitch = face.headEulerAngleX,
-                yaw = face.headEulerAngleY,
-                roll = face.headEulerAngleZ,
-                nose = face.getLandmark(FaceLandmark.NOSE_BASE)?.position,
-                leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)?.position,
-                rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position,
-            )
-        }
-    }
-
-    /** Shoulder keypoints (image px) and their in-frame likelihoods; neck base = shoulder midpoint. */
-    private data class ShoulderFeatures(
-        val left: PointF,
-        val right: PointF,
-        val leftLikelihood: Float,
-        val rightLikelihood: Float,
-    ) {
-        val neck: PointF get() = PointF((left.x + right.x) / 2, (left.y + right.y) / 2)
-
-        companion object {
-            fun from(pose: Pose): ShoulderFeatures? {
-                val l = pose.getPoseLandmark(PoseLandmark.LEFT_SHOULDER) ?: return null
-                val r = pose.getPoseLandmark(PoseLandmark.RIGHT_SHOULDER) ?: return null
-                return ShoulderFeatures(l.position, r.position, l.inFrameLikelihood, r.inFrameLikelihood)
-            }
-        }
-    }
-
     companion object {
         private const val TAG = "NeckCollectActivity"
-        private const val PREFS = "neck"
-        private const val KEY_NORM_REF = "norm_ref"
+        private const val PREFS = ModeBFeatures.PREFS
+        private const val KEY_NORM_REF = ModeBFeatures.KEY_NORM_REF
         private const val CALIBRATION_MS = 3000L
         private const val CAL_MAX_TILT_DEG = 15.0
         private const val CAL_MAX_PITCH_DEG = 10f
         private const val CAL_MIN_FRAMES = 5
-        private const val MIN_SHOULDER_LIKELIHOOD = 0.5f
+        private const val MIN_SHOULDER_LIKELIHOOD = ModeBFeatures.MIN_SHOULDER_LIKELIHOOD
     }
 }
