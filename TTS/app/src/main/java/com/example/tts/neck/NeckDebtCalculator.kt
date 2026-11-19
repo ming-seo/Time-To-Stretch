@@ -7,8 +7,9 @@ enum class NeckState { BENT, UPRIGHT, NOT_IN_USE, STATIC_DEVICE, SUPINE_LIKE }
 
 /**
  * Judges each cycle and updates the neck debt D_n (design doc §4.6). Pure logic, no Android dependencies.
- * With the personal mapping g() ready, a cycle is BENT when the estimated neck angle g(CATA) ≥ [bentNeckDeg]
- * and adds the Hansraj load weight; before that, the SmartPose default (CATA ≥ 56°) adds [bentIncrement].
+ * With a neck angle for the cycle (camera burst, or g(CATA) with or without the burst residual), a cycle is
+ * BENT when it is ≥ [bentNeckDeg] and adds the Hansraj load weight; without one, the SmartPose default
+ * (CATA ≥ 56°) adds [bentIncrement].
  */
 class NeckDebtCalculator(
     private val minValidWindows: Int = 6,
@@ -19,7 +20,7 @@ class NeckDebtCalculator(
     private val restDecrement: Double = 0.5,
 ) {
 
-    /** [neckDeg] is g(CATA), or null while g() is not ready. */
+    /** [neckDeg] is the cycle's neck angle from [NeckEstimator], or null when there is none (then CATA is used). */
     fun judge(cycle: CycleResult, neckDeg: Double? = null): NeckState {
         val cata = cycle.cata
         return when {
@@ -37,7 +38,7 @@ class NeckDebtCalculator(
         }
     }
 
-    /** [neckDeg] is the g(CATA) used in [judge]; BENT adds w(neckDeg) with it, [bentIncrement] without. */
+    /** [neckDeg] is the neck angle used in [judge]; BENT adds w(neckDeg) with it, [bentIncrement] without. */
     fun update(debt: Double, state: NeckState, neckDeg: Double? = null): Double = when (state) {
         NeckState.BENT -> debt + (neckDeg?.let { loadWeight(it) } ?: bentIncrement)
         NeckState.UPRIGHT -> max(0.0, debt - uprightDecrement)
