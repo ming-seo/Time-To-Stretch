@@ -3,13 +3,15 @@ package com.example.tts.neck
 import kotlin.math.max
 
 /** Mode A posture state of one 60-second cycle (design doc §4.2). */
-enum class NeckState { BENT, UPRIGHT, NOT_IN_USE, STATIC_DEVICE, SUPINE_LIKE }
+enum class NeckState { BENT, UPRIGHT, NOT_IN_USE, STATIC_DEVICE, SUPINE_LIKE, SIDE_LYING_LIKE }
 
 /**
  * Judges each cycle and updates the neck debt D_n (design doc §4.6). Pure logic, no Android dependencies.
  * With a neck angle for the cycle (camera burst, or g(CATA) with or without the burst residual), a cycle is
  * BENT when it is ≥ [bentNeckDeg] and adds the Hansraj load weight; without one, the SmartPose default
- * (CATA ≥ 56°) adds [bentIncrement].
+ * (CATA ≥ 56°) adds [bentIncrement]. When at least [lyingMinFraction] of the valid windows are lying (SUPINE or
+ * SIDE_LYING), the cycle is SUPINE_LIKE or SIDE_LYING_LIKE (whichever has more windows; SUPINE_LIKE on a tie) and
+ * D_n is left unchanged; otherwise CATA comes from the TRUNK_UPRIGHT windows only.
  */
 class NeckDebtCalculator(
     private val minValidWindows: Int = 6,
@@ -18,11 +20,13 @@ class NeckDebtCalculator(
     private val bentIncrement: Double = 1.0,
     private val uprightDecrement: Double = 0.25,
     private val restDecrement: Double = 0.5,
+    private val lyingMinFraction: Double = 0.5,
 ) {
 
     /** [neckDeg] is the cycle's neck angle from [NeckEstimator], or null when there is none (then CATA is used). */
     fun judge(cycle: CycleResult, neckDeg: Double? = null): NeckState {
         val cata = cycle.cata
+        val lying = cycle.supineWindowCount + cycle.sideLyingWindowCount
         return when {
             cycle.validWindowCount < minValidWindows ->
                 if (cycle.validWindowCount + cycle.staticWindowCount >= minValidWindows) {
@@ -30,8 +34,9 @@ class NeckDebtCalculator(
                 } else {
                     NeckState.NOT_IN_USE
                 }
+            lying >= lyingMinFraction * cycle.validWindowCount ->
+                if (cycle.sideLyingWindowCount > cycle.supineWindowCount) NeckState.SIDE_LYING_LIKE else NeckState.SUPINE_LIKE
             cata == null -> NeckState.NOT_IN_USE
-            cata < 0.0 -> NeckState.SUPINE_LIKE
             neckDeg != null -> if (neckDeg >= bentNeckDeg) NeckState.BENT else NeckState.UPRIGHT
             cata >= bentCataDeg -> NeckState.BENT
             else -> NeckState.UPRIGHT
@@ -43,7 +48,7 @@ class NeckDebtCalculator(
         NeckState.BENT -> debt + (neckDeg?.let { loadWeight(it) } ?: bentIncrement)
         NeckState.UPRIGHT -> max(0.0, debt - uprightDecrement)
         NeckState.NOT_IN_USE -> max(0.0, debt - restDecrement)
-        NeckState.STATIC_DEVICE, NeckState.SUPINE_LIKE -> debt
+        NeckState.STATIC_DEVICE, NeckState.SUPINE_LIKE, NeckState.SIDE_LYING_LIKE -> debt
     }
 
     companion object {

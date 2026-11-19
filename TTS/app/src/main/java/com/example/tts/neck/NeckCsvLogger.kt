@@ -22,7 +22,7 @@ class NeckCsvLogger(context: Context) {
             w.tiltCount, fmt(w.tiltMean), fmt(w.tiltStd),
             w.linAccCount, fmt(w.linAccMean), fmt(w.linAccMax),
             w.staticDevice, w.excludeReasons.sorted().joinToString("|"),
-            fmt(w.contentRoll), w.displayRotation ?: "",
+            fmt(w.contentRoll), w.displayRotation ?: "", w.posture ?: "",
         ).joinToString(","),
         w.startMs,
     )
@@ -45,6 +45,7 @@ class NeckCsvLogger(context: Context) {
             c.startMs, c.endMs, c.windowCount, c.validWindowCount,
             fmt(c.cata), fmt(c.tiltStd), fmt(c.linAccMean), fmt(c.linAccMax),
             c.staticWindowCount, state, fmt(debt), fmt(gCata), fmt(gSigma), fmt(neck?.deg), neck?.source ?: "",
+            c.supineWindowCount, c.sideLyingWindowCount,
         ).joinToString(","),
         c.startMs,
     )
@@ -73,10 +74,10 @@ class NeckCsvLogger(context: Context) {
 
         private const val WINDOW_HEADER =
             "start_ms,end_ms,screen_in_use,excluded,tilt_n,tilt_mean_deg,tilt_std_deg,linacc_n,linacc_mean,linacc_max," +
-                "static_device,exclude_reason,content_roll_deg,display_rotation_deg"
+                "static_device,exclude_reason,content_roll_deg,display_rotation_deg,posture"
         private const val CYCLE_HEADER =
             "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max," +
-                "static_windows,state,d_n,g_cata_deg,g_sigma_deg,neck_deg,neck_src"
+                "static_windows,state,d_n,g_cata_deg,g_sigma_deg,neck_deg,neck_src,supine_windows,side_lying_windows"
         private const val SAMPLE_HEADER =
             "start_ms,end_ms,frames,face_frames,valid_frames,theta_phone_deg,theta_neck_deg,face_pitch_deg,fail_reason,theta_neck_std_deg"
         private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)

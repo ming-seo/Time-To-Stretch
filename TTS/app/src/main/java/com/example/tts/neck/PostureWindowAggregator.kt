@@ -1,8 +1,19 @@
 package com.example.tts.neck
 
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.sqrt
+
+/** Body posture of one valid window, from its mean tilt and content roll. */
+enum class WindowPosture {
+    /** Sitting or standing (assumption A1 holds); only these windows feed CATA. */
+    TRUNK_UPRIGHT,
+    /** Lying on the back: screen facing down. */
+    SUPINE,
+    /** Lying on the side: screen near vertical, content turned about 90° from gravity. */
+    SIDE_LYING,
+}
 
 /** One 5-second monitoring window (SmartPose "monitoring period"). */
 data class WindowResult(
@@ -26,6 +37,8 @@ data class WindowResult(
     val contentRoll: Double? = null,
     /** Display rotation (°: 0/90/180/270) at the window's last gravity sample; null without samples. */
     val displayRotation: Int? = null,
+    /** Posture of a valid window; null when the window is not valid. */
+    val posture: WindowPosture? = null,
 ) {
     /** Would be valid if the phone had not been still. */
     val usable: Boolean get() = screenInUse && !excluded && tiltCount > 0
@@ -40,21 +53,31 @@ data class CycleResult(
     val validWindowCount: Int,
     /** Windows dropped only because the phone lay still. */
     val staticWindowCount: Int,
-    /** Mean of the valid windows' mean tilt (SmartPose CATA). */
+    /** Mean of the TRUNK_UPRIGHT valid windows' mean tilt (SmartPose CATA). */
     val cata: Double?,
-    /** Standard deviation of the valid windows' mean tilt. */
+    /** Standard deviation of the TRUNK_UPRIGHT valid windows' mean tilt. */
     val tiltStd: Double?,
     val linAccMean: Double?,
     val linAccMax: Double?,
+    /** Valid windows labelled SUPINE. */
+    val supineWindowCount: Int = 0,
+    /** Valid windows labelled SIDE_LYING. */
+    val sideLyingWindowCount: Int = 0,
 )
 
 /**
  * Collects tilt and linear-acceleration samples into 5-second windows and groups
  * every [windowsPerCycle] windows into a cycle. Pure logic, no Android dependencies.
+ * A valid window is SUPINE when its mean tilt is below [supineMaxTiltDeg], SIDE_LYING when |tilt| ≤ [sideMaxAbsTiltDeg]
+ * (content roll is unstable on a flat phone) and |content roll| is within [sideMinRollDeg]..[sideMaxRollDeg].
  */
 class PostureWindowAggregator(
     private val windowsPerCycle: Int = 12,
     private val staticLinAccMax: Double = 0.15,
+    private val supineMaxTiltDeg: Double = -15.0,
+    private val sideMaxAbsTiltDeg: Double = 60.0,
+    private val sideMinRollDeg: Double = 60.0,
+    private val sideMaxRollDeg: Double = 120.0,
 ) {
 
     private var windowStartMs = 0L
@@ -121,7 +144,7 @@ class PostureWindowAggregator(
             linAccMax = if (linAcc.count > 0) linAccMax else null,
             contentRoll = if (contentGravityCount > 0) Math.toDegrees(atan2(contentGravityX, contentGravityY)) else null,
             displayRotation = if (contentGravityCount > 0) displayRotation * 90 else null,
-        )
+        ).let { it.copy(posture = if (it.valid) classify(it.tiltMean!!, it.contentRoll) else null) }
         cycleWindows += window
 
         var cycle: CycleResult? = null
@@ -138,9 +161,18 @@ class PostureWindowAggregator(
         cycleWindows.clear()
     }
 
+    private fun classify(tilt: Double, contentRoll: Double?): WindowPosture = when {
+        tilt < supineMaxTiltDeg -> WindowPosture.SUPINE
+        contentRoll != null && abs(tilt) <= sideMaxAbsTiltDeg && abs(contentRoll) in sideMinRollDeg..sideMaxRollDeg ->
+            WindowPosture.SIDE_LYING
+        else -> WindowPosture.TRUNK_UPRIGHT
+    }
+
     private fun buildCycle(windows: List<WindowResult>): CycleResult {
         val valid = windows.filter { it.valid }
-        val tiltMeans = RunningStats().apply { valid.forEach { add(it.tiltMean!!) } }
+        val tiltMeans = RunningStats().apply {
+            valid.filter { it.posture == WindowPosture.TRUNK_UPRIGHT }.forEach { add(it.tiltMean!!) }
+        }
         val withLinAcc = valid.filter { it.linAccCount > 0 }
         return CycleResult(
             startMs = windows.first().startMs,
@@ -152,6 +184,8 @@ class PostureWindowAggregator(
             tiltStd = tiltMeans.stdOrNull(),
             linAccMean = if (withLinAcc.isEmpty()) null else withLinAcc.map { it.linAccMean!! }.average(),
             linAccMax = withLinAcc.maxOfOrNull { it.linAccMax!! },
+            supineWindowCount = valid.count { it.posture == WindowPosture.SUPINE },
+            sideLyingWindowCount = valid.count { it.posture == WindowPosture.SIDE_LYING },
         )
     }
 
