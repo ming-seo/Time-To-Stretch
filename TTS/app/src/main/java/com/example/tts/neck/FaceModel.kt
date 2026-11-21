@@ -23,8 +23,9 @@ class FaceModel(val points: List<DoubleArray>, val alphaRefDeg: Double, val repr
         val LANDMARKS = listOf("eye_l", "eye_r", "nose_base", "mouth_l", "mouth_r", "mouth_b", "cheek_l", "cheek_r")
 
         /**
-         * Average face (cm) used as the starting point and weak prior of the reconstruction. Head axes: x image right
-         * (the subject's left eye appears on the right of the unmirrored front camera image), y down, z away from the camera.
+         * Average face (cm) used as the starting point and weak prior of the reconstruction. Head axes: x image right,
+         * y down, z away from the camera. Written with ML Kit's LEFT_EYE at +x; the reconstruction mirrors it to the
+         * side where LEFT_EYE is detected (on Galaxy S9 it is on the image left, −x, in the unmirrored buffer).
          */
         val GENERIC_POINTS = listOf(
             doubleArrayOf(3.15, 0.0, 0.0), doubleArrayOf(-3.15, 0.0, 0.0), doubleArrayOf(0.0, 4.2, -1.5),
@@ -85,7 +86,7 @@ object FaceModelCalibrator {
     ): Reconstruction {
         val k = FaceModel.LANDMARKS.size
         val front = views[0].landmarks
-        // Mirror the prior if the left eye appears on the left of the image (mirrored buffer).
+        // Put the prior's LEFT_EYE on the image side where ML Kit detected it.
         val sign = if (front[0][0] >= front[1][0]) 1.0 else -1.0
         val prior = FaceModel.GENERIC_POINTS.map { doubleArrayOf(sign * it[0], it[1], it[2]) }
 
