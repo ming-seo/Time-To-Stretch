@@ -49,6 +49,8 @@ class NeckSensingService : Service(), SensorEventListener {
     private var lastSampleAttemptMs = 0L
     private var mapping = NeckMapping()
     private val estimator = NeckEstimator()
+    /** Latest gravity vector for the mode C camera bursts; null while the screen is not in use. */
+    private var latestGravity: FloatArray? = null
 
     // Low-pass filtered accelerometer, used only when TYPE_GRAVITY is unavailable.
     private val fallbackGravity = FloatArray(3)
@@ -74,9 +76,15 @@ class NeckSensingService : Service(), SensorEventListener {
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         defaultDisplay = (getSystemService(DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
         logger = NeckCsvLogger(this)
-        sampler = NeckCameraSampler(this, phoneTilt = { NeckLiveState.currentTilt })
+        sampler = NeckCameraSampler(this, gravity = { latestGravity })
         debt = prefs().getFloat(NeckDebtCalculator.KEY_DEBT, 0f).toDouble()
         mapping = NeckMapping.load(prefs())
+        if (prefs().getString(KEY_G_SOURCE, null) != G_SOURCE_MODE_C) {
+            // g() fitted on mode B neck angles must not mix with mode C pairs (design doc §11.10): start over once.
+            mapping = NeckMapping()
+            mapping.save(prefs())
+            prefs().edit().putString(KEY_G_SOURCE, G_SOURCE_MODE_C).apply()
+        }
 
         startInForeground()
 
@@ -137,6 +145,7 @@ class NeckSensingService : Service(), SensorEventListener {
         val (cx, cy) = TiltCalculator.toContentFrame(gx, gy, rotation)
         aggregator.addContentGravity(cx, cy, rotation)
         NeckLiveState.currentTilt = tilt
+        latestGravity = floatArrayOf(gx, gy, gz)
         if (isInCall()) aggregator.markExcluded("call")
     }
 
@@ -189,6 +198,7 @@ class NeckSensingService : Service(), SensorEventListener {
             sampler.cancel()
             unregisterSensors()
             NeckLiveState.currentTilt = null
+            latestGravity = null
         }
     }
 
@@ -236,6 +246,9 @@ class NeckSensingService : Service(), SensorEventListener {
     companion object {
         private const val WINDOW_MS = 5_000L
         private const val SAMPLE_INTERVAL_MS = 120_000L
+        /** Which camera estimate the stored g() was fitted on; anything else is cleared once on start. */
+        private const val KEY_G_SOURCE = "g_source"
+        private const val G_SOURCE_MODE_C = "C"
         private const val LOW_PASS_ALPHA = 0.8f
         private const val CHANNEL_ID = "neck_sensing"
         private const val NOTIFICATION_ID = 2001
