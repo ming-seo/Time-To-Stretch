@@ -7,11 +7,16 @@ import com.google.android.gms.location.ActivityTransitionEvent
 import com.google.android.gms.location.DetectedActivity
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.math.max
 
 /**
- * Persists the "still since" state across the ActivityTransitionReceiver process
- * and the UI process via SharedPreferences, and derives the current sedentary
- * duration (D_s candidate) from it.
+ * Sedentary debt D_s, mirroring NeckDebtCalculator's D_n so the two can be combined as
+ * D = w_n * D_n + w_s * D_s: accrues at [STILL_RATE_PER_MINUTE] while the device is
+ * continuously STILL, decays at [MOVING_RATE_PER_MINUTE] while WALKING/RUNNING, floored at 0.
+ *
+ * There is no periodic tick; debt is evaluated lazily from the last committed
+ * (anchor time, debt at that time, state since then), the same way a bank computes
+ * accrued interest on read instead of ticking a background clock.
  */
 class SedentaryTracker(context: Context) {
 
@@ -19,44 +24,66 @@ class SedentaryTracker(context: Context) {
 
     fun onTransitionEvent(event: ActivityTransitionEvent) {
         val now = System.currentTimeMillis()
-        val isStillEnter = event.activityType == DetectedActivity.STILL &&
-            event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
-        val isMovementEnter = (event.activityType == DetectedActivity.WALKING ||
-            event.activityType == DetectedActivity.RUNNING) &&
-            event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
-
-        when {
-            isStillEnter -> prefs.edit {
-                putLong(KEY_STILL_SINCE, now)
-                putBoolean(KEY_IS_STILL, true)
-            }
-            isMovementEnter -> prefs.edit {
-                putBoolean(KEY_IS_STILL, false)
-            }
+        val newIsStill = when {
+            event.activityType == DetectedActivity.STILL &&
+                event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER -> true
+            event.activityType == DetectedActivity.STILL &&
+                event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_EXIT -> false
+            (event.activityType == DetectedActivity.WALKING || event.activityType == DetectedActivity.RUNNING) &&
+                event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER -> false
+            else -> isStill()
         }
-
+        commit(now, newIsStill, monitoring = true)
         appendLog("${describe(event)} @ ${TIME_FORMAT.format(now)}")
     }
 
-    /** Sedentary duration in millis; 0 while the user is not in a continuous STILL streak. */
-    fun getSedentaryMillis(): Long {
-        val isStill = prefs.getBoolean(KEY_IS_STILL, false)
-        val since = prefs.getLong(KEY_STILL_SINCE, 0L)
-        return if (isStill && since > 0L) System.currentTimeMillis() - since else 0L
+    /** Call once monitoring starts: resumes accrual from whatever D_s/state was last committed. */
+    fun start() {
+        commit(System.currentTimeMillis(), isStill(), monitoring = true)
     }
+
+    /** Call once monitoring stops: freezes D_s so it no longer drifts while there is no signal. */
+    fun stop() {
+        commit(System.currentTimeMillis(), isStill(), monitoring = false)
+    }
+
+    /** Current D_s (minutes-equivalent debt units), evaluated lazily. */
+    fun getDebt(): Double = debtAt(System.currentTimeMillis())
+
+    fun isStill(): Boolean = prefs.getBoolean(KEY_IS_STILL, false)
+
+    fun isMonitoring(): Boolean = prefs.getBoolean(KEY_MONITORING, false)
 
     fun getLog(): String = prefs.getString(KEY_LOG, "") ?: ""
 
-    /** Call when monitoring stops: the stored STILL state is no longer being kept up to date. */
-    fun reset() {
+    fun clearLog() {
+        prefs.edit { remove(KEY_LOG) }
+    }
+
+    private fun commit(now: Long, newIsStill: Boolean, monitoring: Boolean) {
+        val debtNow = debtAt(now)
         prefs.edit {
-            putBoolean(KEY_IS_STILL, false)
-            remove(KEY_STILL_SINCE)
+            putFloat(KEY_BASE_DEBT, debtNow.toFloat())
+            putLong(KEY_ANCHOR_TIME, now)
+            putBoolean(KEY_IS_STILL, newIsStill)
+            putBoolean(KEY_MONITORING, monitoring)
         }
     }
 
-    fun clearLog() {
-        prefs.edit { remove(KEY_LOG) }
+    /** D_s at [time], extrapolated from the last commit; frozen whenever monitoring is off. */
+    private fun debtAt(time: Long): Double {
+        val baseDebt = prefs.getFloat(KEY_BASE_DEBT, 0f).toDouble()
+        if (!prefs.getBoolean(KEY_MONITORING, false)) return baseDebt
+
+        val anchorTime = prefs.getLong(KEY_ANCHOR_TIME, time)
+        val wasStill = prefs.getBoolean(KEY_IS_STILL, false)
+        val elapsedMinutes = max(0L, time - anchorTime) / 60_000.0
+        val delta = if (wasStill) {
+            STILL_RATE_PER_MINUTE * elapsedMinutes
+        } else {
+            -MOVING_RATE_PER_MINUTE * elapsedMinutes
+        }
+        return max(0.0, baseDebt + delta)
     }
 
     private fun appendLog(line: String) {
@@ -81,11 +108,17 @@ class SedentaryTracker(context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "posture_prefs"
+        private const val PREFS_NAME = "sedentary"
+        private const val KEY_BASE_DEBT = "base_debt"
+        private const val KEY_ANCHOR_TIME = "anchor_time"
         private const val KEY_IS_STILL = "is_still"
-        private const val KEY_STILL_SINCE = "still_since"
+        private const val KEY_MONITORING = "monitoring"
         private const val KEY_LOG = "transition_log"
         private const val MAX_LOG_LINES = 20
         private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
+        // Placeholder rates; to be calibrated against real usage once both debts feed one notification.
+        private const val STILL_RATE_PER_MINUTE = 1.0
+        private const val MOVING_RATE_PER_MINUTE = 2.0
     }
 }

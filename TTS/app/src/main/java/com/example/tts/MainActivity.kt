@@ -115,6 +115,7 @@ class MainActivity : AppCompatActivity() {
             .addOnSuccessListener {
                 isMonitoring = true
                 btnToggleMonitoring.text = "모니터링 중지"
+                tracker.start()
                 Log.d(TAG, "requestActivityTransitionUpdates succeeded")
                 Toast.makeText(this, "모니터링 시작", Toast.LENGTH_SHORT).show()
                 refreshUi()
@@ -131,7 +132,7 @@ class MainActivity : AppCompatActivity() {
             .addOnSuccessListener {
                 isMonitoring = false
                 btnToggleMonitoring.text = "모니터링 시작"
-                tracker.reset()
+                tracker.stop()
                 refreshUi()
                 Toast.makeText(this, "모니터링 중지", Toast.LENGTH_SHORT).show()
             }
@@ -148,14 +149,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshUi() {
-        val sedentaryMillis = tracker.getSedentaryMillis()
-        tvSedentaryStatus.text = when {
-            sedentaryMillis > 0 -> {
-                val totalSeconds = sedentaryMillis / 1000
-                "정지(앉음 추정) 지속시간: %d분 %d초".format(totalSeconds / 60, totalSeconds % 60)
-            }
-            isMonitoring -> "대기 중 (아직 감지된 정지 없음)"
-            else -> "모니터링 전"
+        val debt = tracker.getDebt()
+        tvSedentaryStatus.text = if (isMonitoring) {
+            val stateLabel = if (tracker.isStill()) "정지 중" else "이동 중"
+            "D_s = %.2f (%s)".format(debt, stateLabel)
+        } else {
+            "모니터링 전 (D_s = %.2f)".format(debt)
         }
         tvLog.text = tracker.getLog().ifBlank { "(아직 이벤트 없음)" }
     }
