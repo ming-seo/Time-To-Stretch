@@ -119,9 +119,8 @@ class MainActivity : AppCompatActivity() {
         val enabled = Stretch.isEnabled(this)
         val running = NeckLiveState.running
         tvServiceStatus.text = when {
-            enabled && running -> "백그라운드 측정 켜짐"
-            enabled -> "백그라운드 측정 켜짐 (서비스 시작 대기)"
-            running -> "목 각도 화면에서만 측정 중"
+            running -> "백그라운드 측정 켜짐"
+            enabled -> "백그라운드 측정 시작 중…"
             else -> "백그라운드 측정 꺼짐"
         }
         btnToggleMonitoring.text = if (enabled) "백그라운드 측정 중지" else "백그라운드 측정 시작"
