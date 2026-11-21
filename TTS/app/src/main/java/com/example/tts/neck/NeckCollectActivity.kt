@@ -380,8 +380,10 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                 updateCalibration(tsMs, gravity, face, shoulders)
                 updateCalibrationC(tsMs, gravity, deviceRotation, face, uprightWidth, uprightHeight)
                 val neckDeg = predictNeck(gravity, face, shoulders)
-                showFeatures(face, shoulders, uprightWidth, uprightHeight, neckDeg, calibrationCText(gravity, deviceRotation))
-                recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders, neckDeg)
+                val pose = estimateModeC(tsMs, face, uprightWidth, uprightHeight)
+                val neckC = pose?.let { p -> gravity?.let { modeCFlexion(p, it) } }
+                showFeatures(face, shoulders, uprightWidth, uprightHeight, neckDeg, calibrationCText(gravity, deviceRotation), pose, neckC)
+                recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders, neckDeg, pose, neckC)
             }
             .addOnCompleteListener { imageProxy.close() }
     }
@@ -394,6 +396,8 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         face: FaceFeatures?,
         shoulders: ShoulderFeatures?,
         neckDeg: Double?,
+        pose: FacePose?,
+        neckC: Double?,
     ) {
         val r = recorder ?: return
         r.write(
@@ -408,10 +412,35 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                 shoulders?.left?.x, shoulders?.left?.y, shoulders?.leftLikelihood,
                 shoulders?.right?.x, shoulders?.right?.y, shoulders?.rightLikelihood,
                 normRef, neckDeg,
+                face?.mouthLeft?.x, face?.mouthLeft?.y,
+                face?.mouthRight?.x, face?.mouthRight?.y,
+                face?.mouthBottom?.x, face?.mouthBottom?.y,
+                face?.leftCheek?.x, face?.leftCheek?.y,
+                face?.rightCheek?.x, face?.rightCheek?.y,
+                face?.center?.x, face?.center?.y,
+                pose?.pitchDeg, pose?.yawDeg, pose?.distCm, pose?.reprojRms, neckC,
             )
         )
         btnRecord.text = "기록 중지 (${r.frameCount}프레임)"
     }
+
+    /** Mode C face pose by PnP on the user's face model (design doc §11.6); null without model, focal length or landmarks. */
+    private fun estimateModeC(tsMs: Long, face: FaceFeatures?, imageWidth: Int, imageHeight: Int): FacePose? {
+        val model = faceModel ?: return null
+        val f = focalPx ?: return null
+        val landmarks = face?.modeCLandmarks()?.map { it?.toXY() } ?: return null
+        val previous = lastPose?.takeIf { tsMs - lastPoseMs <= POSE_REUSE_MS }
+        val pose = FacePoseSolver.solve(model.points, landmarks, f, imageWidth / 2.0, imageHeight / 2.0, previous)
+        if (pose != null) {
+            lastPose = pose
+            lastPoseMs = tsMs
+        }
+        return pose
+    }
+
+    /** θ_C: head flexion relative to gravity minus α_ref (design doc §11.3). */
+    private fun modeCFlexion(pose: FacePose, gravity: FloatArray): Double =
+        ModeCGeometry.headFlexion(pose.rotation, gravity[0], gravity[1], gravity[2]) - faceModel!!.alphaRefDeg
 
     /** Neck angle (°) from the Watanabe model; null without model, Norm_ref, phone tilt, face or both shoulders. */
     private fun predictNeck(gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?): Double? =
@@ -426,6 +455,8 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         imageHeight: Int,
         neckDeg: Double?,
         calibrationCText: String?,
+        pose: FacePose?,
+        neckC: Double?,
     ) {
         overlayView.setPoints(
             imageWidth,
@@ -450,6 +481,12 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                 neckModel == null -> "모델 파일 없음"
                 neckDeg == null -> "-"
                 else -> String.format(Locale.US, "%.1f°", neckDeg)
+            } +
+            "\n모드 C: " + when {
+                faceModel == null -> "캘리브레이션 필요"
+                pose == null -> "-"
+                else -> "얼굴 pitch ${fmtD(pose.pitchDeg)}° · yaw ${fmtD(pose.yawDeg)}° · ${fmtD(pose.distCm)} cm · " +
+                    "오차 ${fmtD(pose.reprojRms)} px\n머리 숙임 θ_C: ${neckC?.let { fmtD(it) + "°" } ?: "-"}"
             }
     }
 
@@ -465,6 +502,8 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         private const val CAL_MAX_TILT_DEG = 15.0
         private const val CAL_MAX_PITCH_DEG = 10f
         private const val CAL_MIN_FRAMES = 5
+        /** A mode C pose newer than this (ms) starts the next frame's PnP. */
+        private const val POSE_REUSE_MS = 500L
         private const val MIN_SHOULDER_LIKELIHOOD = ModeBFeatures.MIN_SHOULDER_LIKELIHOOD
     }
 }
