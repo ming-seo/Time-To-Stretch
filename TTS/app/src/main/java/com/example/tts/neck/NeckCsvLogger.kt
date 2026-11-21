@@ -50,12 +50,14 @@ class NeckCsvLogger(context: Context) {
         c.startMs,
     )
 
+    /** Mode C camera bursts (design doc §11.10); a new file prefix because the columns differ from mode B's `samples_*`. */
     fun logSample(s: FaceSample) = append(
-        "samples",
+        "samples_c",
         SAMPLE_HEADER,
         listOf(
             s.startMs, s.endMs, s.frames, s.faceFrames, s.validFrames,
             fmt(s.phoneTilt), fmt(s.neckDeg), fmt(s.facePitch), s.failReason ?: "", fmt(s.neckStd),
+            fmt(s.cPitch), fmt(s.cDistCm), fmt(s.cReprojPx),
         ).joinToString(","),
         s.startMs,
     )
@@ -79,7 +81,8 @@ class NeckCsvLogger(context: Context) {
             "start_ms,end_ms,windows,valid_windows,cata_deg,tilt_std_deg,linacc_mean,linacc_max," +
                 "static_windows,state,d_n,g_cata_deg,g_sigma_deg,neck_deg,neck_src,supine_windows,side_lying_windows"
         private const val SAMPLE_HEADER =
-            "start_ms,end_ms,frames,face_frames,valid_frames,theta_phone_deg,theta_neck_deg,face_pitch_deg,fail_reason,theta_neck_std_deg"
+            "start_ms,end_ms,frames,face_frames,valid_frames,theta_phone_deg,theta_c_deg,face_pitch_deg,fail_reason,theta_c_std_deg," +
+                "c_pitch_deg,c_dist_cm,c_reproj_px"
         private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 }
