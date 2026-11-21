@@ -9,11 +9,24 @@ import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 
-/** Restarts background monitoring after reboot or app update if the user had it on. */
+/**
+ * Marks power-off so the service stop it triggers isn't taken as the user turning monitoring off,
+ * and restarts monitoring after reboot or app update if the user had it on.
+ */
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        when (intent.action) {
+            Intent.ACTION_SHUTDOWN, ACTION_QUICKBOOT_POWEROFF -> {
+                Log.d(TAG, "shutdown: keeping monitoring state")
+                Stretch.onShutdown(context)
+            }
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> restartIfEnabled(context, intent.action!!)
+        }
+    }
+
+    private fun restartIfEnabled(context: Context, action: String) {
+        Stretch.onBoot(context)
         if (!Stretch.isEnabled(context)) return
         // A health-type foreground service cannot start on Android 14+ without this permission.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
@@ -23,11 +36,12 @@ class BootReceiver : BroadcastReceiver() {
             Log.w(TAG, "ACTIVITY_RECOGNITION revoked; not restarting")
             return
         }
-        Log.d(TAG, "restarting monitoring after ${intent.action}")
+        Log.d(TAG, "restarting monitoring after $action")
         Stretch.enable(context)
     }
 
     companion object {
-        private const val TAG = "BootReceiver"
+        private const val TAG = "TtsBootReceiver"
+        private const val ACTION_QUICKBOOT_POWEROFF = "android.intent.action.QUICKBOOT_POWEROFF"
     }
 }

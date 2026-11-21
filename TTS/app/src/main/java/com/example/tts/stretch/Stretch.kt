@@ -45,15 +45,30 @@ object Stretch {
      * The service's own start/stop also sets [KEY_ENABLED], so starting or stopping from any screen
      * (this app's home or NeckActivity) leaves one consistent on/off state. A process kill skips
      * onDestroy, so the flag stays on and the service comes back via START_STICKY or [BootReceiver].
+     * Some OEMs (Samsung) do run onDestroy at power-off, so a stop after [onShutdown] keeps the flag.
      */
     fun onServiceStart(context: Context) {
-        prefs(context).edit { putBoolean(KEY_ENABLED, true) }
+        prefs(context).edit {
+            putBoolean(KEY_ENABLED, true)
+            putBoolean(KEY_SHUTTING_DOWN, false)
+        }
         SedentaryTracker(context).start()
         registerTransitions(context)
     }
 
+    fun onShutdown(context: Context) {
+        prefs(context).edit(commit = true) { putBoolean(KEY_SHUTTING_DOWN, true) }
+    }
+
+    fun onBoot(context: Context) {
+        prefs(context).edit { putBoolean(KEY_SHUTTING_DOWN, false) }
+    }
+
     fun onServiceStop(context: Context) {
-        prefs(context).edit { putBoolean(KEY_ENABLED, false) }
+        val prefs = prefs(context)
+        if (!prefs.getBoolean(KEY_SHUTTING_DOWN, false)) {
+            prefs.edit(commit = true) { putBoolean(KEY_ENABLED, false) }
+        }
         ActivityRecognition.getClient(context).removeActivityTransitionUpdates(transitionPendingIntent(context))
         SedentaryTracker(context).stop()
     }
@@ -139,6 +154,7 @@ object Stretch {
     private const val TAG = "Stretch"
     private const val PREFS = "stretch"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_SHUTTING_DOWN = "shutting_down"
     private const val KEY_LAST_D = "last_d"
     private const val KEY_LAST_EVAL_AT = "last_eval_at"
     private const val KEY_LAST_NOTIFIED_AT = "last_notified_at"
