@@ -37,9 +37,12 @@ class SedentaryTracker(context: Context) {
         appendLog("${describe(event)} @ ${TIME_FORMAT.format(now)}")
     }
 
-    /** Call once monitoring starts: resumes accrual from whatever D_s/state was last committed. */
+    /**
+     * Call once monitoring starts. Assumes STILL: the Transition API sends no STILL ENTER for a state the
+     * device is already in, so starting while seated would otherwise never accrue until the user walks.
+     */
     fun start() {
-        commit(System.currentTimeMillis(), isStill(), monitoring = true)
+        commit(System.currentTimeMillis(), newIsStill = true, monitoring = true)
     }
 
     /** Call once monitoring stops: freezes D_s so it no longer drifts while there is no signal. */

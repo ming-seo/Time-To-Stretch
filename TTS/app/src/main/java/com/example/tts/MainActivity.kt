@@ -1,31 +1,37 @@
 package com.example.tts
 
-import android.app.PendingIntent
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import com.google.android.gms.location.ActivityRecognition
-import com.google.android.gms.location.ActivityTransition
-import com.google.android.gms.location.ActivityTransitionRequest
-import com.google.android.gms.location.DetectedActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.example.tts.neck.NeckActivity
+import com.example.tts.neck.NeckDebtCalculator
+import com.example.tts.neck.NeckLiveState
+import com.example.tts.stretch.Stretch
+import java.text.SimpleDateFormat
+import java.util.Locale
 
+/** Setup and debug home. Monitoring itself runs in NeckSensingService, independent of this screen. */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tracker: SedentaryTracker
-    private lateinit var tvSedentaryStatus: TextView
+    private lateinit var tvServiceStatus: TextView
+    private lateinit var tvDebts: TextView
     private lateinit var tvLog: TextView
     private lateinit var btnToggleMonitoring: Button
-    private lateinit var btnClearLog: Button
-
-    private var isMonitoring = false
 
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
@@ -35,13 +41,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        // CAMERA is optional: without it the neck estimate falls back to phone tilt only.
+        if (results.filterKeys { it != Manifest.permission.CAMERA }.values.all { it }) {
             startMonitoring()
         } else {
-            Toast.makeText(this, "ACTIVITY_RECOGNITION 권한이 필요합니다", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "측정에 필요한 권한이 없습니다", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -50,13 +57,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         tracker = SedentaryTracker(this)
-        tvSedentaryStatus = findViewById(R.id.tvSedentaryStatus)
+        tvServiceStatus = findViewById(R.id.tvServiceStatus)
+        tvDebts = findViewById(R.id.tvDebts)
         tvLog = findViewById(R.id.tvLog)
         btnToggleMonitoring = findViewById(R.id.btnToggleMonitoring)
-        btnClearLog = findViewById(R.id.btnClearLog)
 
         btnToggleMonitoring.setOnClickListener { onToggleClicked() }
-        btnClearLog.setOnClickListener {
+        findViewById<Button>(R.id.btnOpenNeck).setOnClickListener {
+            startActivity(Intent(this, NeckActivity::class.java))
+        }
+        findViewById<Button>(R.id.btnClearLog).setOnClickListener {
             tracker.clearLog()
             refreshUi()
         }
@@ -73,95 +83,65 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onToggleClicked() {
-        if (isMonitoring) {
-            stopMonitoring()
+        if (Stretch.isEnabled(this)) {
+            Stretch.disable(this)
+            refreshUi()
             return
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) !=
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissionLauncher.launch(android.Manifest.permission.ACTIVITY_RECOGNITION)
-        } else {
-            startMonitoring()
+        val missing = (requiredPermissions() + Manifest.permission.CAMERA).filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
+        if (missing.isEmpty()) startMonitoring() else permissionLauncher.launch(missing.toTypedArray())
+    }
+
+    private fun requiredPermissions(): List<String> = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(Manifest.permission.ACTIVITY_RECOGNITION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     private fun startMonitoring() {
-        val transitions = listOf(
-            ActivityTransition.Builder()
-                .setActivityType(DetectedActivity.STILL)
-                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-                .build(),
-            ActivityTransition.Builder()
-                .setActivityType(DetectedActivity.STILL)
-                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
-                .build(),
-            ActivityTransition.Builder()
-                .setActivityType(DetectedActivity.WALKING)
-                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-                .build(),
-            ActivityTransition.Builder()
-                .setActivityType(DetectedActivity.RUNNING)
-                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-                .build()
-        )
-        val request = ActivityTransitionRequest(transitions)
-        val pendingIntent = transitionPendingIntent()
-
-        ActivityRecognition.getClient(this)
-            .requestActivityTransitionUpdates(request, pendingIntent)
-            .addOnSuccessListener {
-                isMonitoring = true
-                btnToggleMonitoring.text = "모니터링 중지"
-                tracker.start()
-                Log.d(TAG, "requestActivityTransitionUpdates succeeded")
-                Toast.makeText(this, "모니터링 시작", Toast.LENGTH_SHORT).show()
-                refreshUi()
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "requestActivityTransitionUpdates failed", e)
-                Toast.makeText(this, "모니터링 시작 실패: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+        Stretch.enable(this)
+        requestBatteryExemption()
+        refreshHandler.postDelayed({ refreshUi() }, 300)
     }
 
-    private fun stopMonitoring() {
-        ActivityRecognition.getClient(this)
-            .removeActivityTransitionUpdates(transitionPendingIntent())
-            .addOnSuccessListener {
-                isMonitoring = false
-                btnToggleMonitoring.text = "모니터링 시작"
-                tracker.stop()
-                refreshUi()
-                Toast.makeText(this, "모니터링 중지", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    private fun transitionPendingIntent(): PendingIntent {
-        val intent = Intent(this, ActivityTransitionReceiver::class.java)
-        return PendingIntent.getBroadcast(
-            this,
-            TRANSITION_REQUEST_CODE,
-            intent,
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    /** Without this, Samsung and other OEMs kill the service a while after the screen turns off. */
+    @SuppressLint("BatteryLife")
+    private fun requestBatteryExemption() {
+        val power = getSystemService(PowerManager::class.java)
+        if (power.isIgnoringBatteryOptimizations(packageName)) return
+        startActivity(
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
         )
     }
 
     private fun refreshUi() {
-        val debt = tracker.getDebt()
-        tvSedentaryStatus.text = if (isMonitoring) {
-            val stateLabel = if (tracker.isStill()) "정지 중" else "이동 중"
-            "D_s = %.2f (%s)".format(debt, stateLabel)
-        } else {
-            "모니터링 전 (D_s = %.2f)".format(debt)
+        val enabled = Stretch.isEnabled(this)
+        val running = NeckLiveState.running
+        tvServiceStatus.text = when {
+            enabled && running -> "백그라운드 측정 켜짐"
+            enabled -> "백그라운드 측정 켜짐 (서비스 시작 대기)"
+            running -> "목 각도 화면에서만 측정 중"
+            else -> "백그라운드 측정 꺼짐"
+        }
+        btnToggleMonitoring.text = if (enabled) "백그라운드 측정 중지" else "백그라운드 측정 시작"
+
+        val dn = getSharedPreferences(NeckDebtCalculator.PREFS, MODE_PRIVATE)
+            .getFloat(NeckDebtCalculator.KEY_DEBT, 0f).toDouble()
+        val ds = tracker.getDebt()
+        val dsState = if (!tracker.isMonitoring()) "고정" else if (tracker.isStill()) "정지 중" else "이동 중"
+        val lastEval = Stretch.lastEvalAt(this).takeIf { it > 0 }?.let { TIME_FORMAT.format(it) } ?: "-"
+        tvDebts.text = buildString {
+            appendLine("D_n = %.2f".format(dn))
+            appendLine("D_s = %.2f (%s)".format(ds, dsState))
+            appendLine("D   = %.2f / 알림 기준 %.0f".format(Stretch.lastCombined(this@MainActivity), Stretch.THRESHOLD))
+            append("마지막 합산: $lastEval")
         }
         tvLog.text = tracker.getLog().ifBlank { "(아직 이벤트 없음)" }
     }
 
     companion object {
-        private const val TAG = "MainActivity"
-        private const val TRANSITION_REQUEST_CODE = 1001
         private const val REFRESH_INTERVAL_MS = 1000L
+        private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     }
 }

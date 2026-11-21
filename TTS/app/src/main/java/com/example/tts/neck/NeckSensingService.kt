@@ -23,6 +23,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.view.Display
 import androidx.core.app.NotificationCompat
+import com.example.tts.stretch.Stretch
 import kotlin.math.sqrt
 
 /**
@@ -94,11 +95,13 @@ class NeckSensingService : Service(), SensorEventListener {
         NeckLiveState.running = true
         NeckLiveState.screenInUse = screenInUse
         NeckLiveState.logDir = logger.dir.absolutePath
+        Stretch.onServiceStart(this)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onDestroy() {
+        Stretch.onServiceStop(this)
         handler.removeCallbacks(windowTick)
         sampler.release()
         unregisterReceiver(screenReceiver)
@@ -154,6 +157,7 @@ class NeckSensingService : Service(), SensorEventListener {
             logger.logCycle(cycle, state, debt, gCata, if (gCata != null) mapping.residualStd else null, neck)
             NeckLiveState.lastCycle = cycle
             NeckLiveState.lastState = state
+            Stretch.onNeckDebt(this, debt)
         }
     }
 

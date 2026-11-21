@@ -6,19 +6,35 @@
     android:padding="24dp">
 
     <TextView
-        android:id="@+id/tvSedentaryStatus"
+        android:id="@+id/tvServiceStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize="22sp"
         android:textStyle="bold"
-        android:text="모니터링 전" />
+        android:text="백그라운드 측정 꺼짐" />
 
     <Button
         android:id="@+id/btnToggleMonitoring"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="모니터링 시작" />
+        android:text="백그라운드 측정 시작" />
+
+    <TextView
+        android:id="@+id/tvDebts"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:fontFamily="monospace"
+        android:textSize="15sp"
+        android:text="-" />
+
+    <Button
+        android:id="@+id/btnOpenNeck"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="목 각도 디버그 화면" />
 
     <LinearLayout
         android:layout_width="match_parent"
