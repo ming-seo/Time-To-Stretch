@@ -29,13 +29,6 @@
         android:textSize="16sp" />
 
     <Button
-        android:id="@+id/btnCalibrate"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="16dp"
-        android:text="기준 자세 측정" />
-
-    <Button
         android:id="@+id/btnCalibrateC"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

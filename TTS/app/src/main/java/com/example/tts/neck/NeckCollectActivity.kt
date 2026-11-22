@@ -32,35 +32,21 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import com.google.mlkit.vision.pose.PoseDetection
-import com.google.mlkit.vision.pose.PoseDetector
-import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
-import com.google.android.gms.tasks.Tasks
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.math.abs
 
-/** Mode B data collection screen: front camera face/shoulder features + phone tilt, recorded to frame CSV. */
+/** Mode C data collection screen: front camera face landmarks + phone tilt, recorded to frame CSV. */
 class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var previewView: PreviewView
     private lateinit var overlayView: KeypointOverlayView
     private lateinit var tvFeatures: TextView
     private lateinit var btnRecord: Button
-    private lateinit var btnCalibrate: Button
     private lateinit var sensorManager: SensorManager
-
-    /** Reference (upright) value of nose–neck / eye distance; null until calibrated. */
-    private var normRef: Float? = null
-    /** Calibration in progress: end time and the ratios of frames that met the reference-posture conditions. */
-    private var calibrationEndMs: Long? = null
-    private val calibrationRatios = mutableListOf<Float>()
-    /** Watanabe neck angle model; null if the asset is missing. */
-    private var neckModel: WatanabeNeckModel? = null
 
     private lateinit var btnCalibrateC: Button
     /** Mode C calibration in progress; null when not calibrating. */
@@ -93,11 +79,6 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .build()
     )
-    private val poseDetector: PoseDetector = PoseDetection.getClient(
-        PoseDetectorOptions.Builder()
-            .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
-            .build()
-    )
 
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -120,10 +101,6 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
         btnRecord.setOnClickListener { if (recorder == null) startRecording() else stopRecording() }
-        btnCalibrate = findViewById(R.id.btnCalibrate)
-        btnCalibrate.setOnClickListener { startCalibration() }
-        normRef = getSharedPreferences(PREFS, MODE_PRIVATE).getFloat(KEY_NORM_REF, Float.NaN).takeUnless { it.isNaN() }
-        neckModel = WatanabeNeckModel.load(this)
         btnCalibrateC = findViewById(R.id.btnCalibrateC)
         btnCalibrateC.setOnClickListener { if (calibrationC == null) startCalibrationC() else stopCalibrationC("모드 C 캘리브레이션 취소") }
         faceModel = FaceModel.load(getSharedPreferences(PREFS, MODE_PRIVATE))
@@ -152,9 +129,6 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         NeckLiveState.collectScreenOpen = false
         sensorManager.unregisterListener(this)
         stopRecording()
-        calibrationEndMs = null
-        btnCalibrate.isEnabled = true
-        btnCalibrate.text = "기준 자세 측정"
         if (calibrationC != null) stopCalibrationC(null)
         if (calibrationG != null) stopCalibrationG(null)
         lastPose = null
@@ -184,46 +158,6 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         r.close()
         btnRecord.text = "기록 시작"
         Toast.makeText(this, "${r.frameCount}프레임 저장: ${r.file.name}", Toast.LENGTH_LONG).show()
-    }
-
-    private fun startCalibration() {
-        calibrationRatios.clear()
-        calibrationEndMs = System.currentTimeMillis() + CALIBRATION_MS
-        btnCalibrate.isEnabled = false
-        btnCalibrate.text = "기준 자세 측정 중…"
-    }
-
-    /** Collects reference-posture frames for 3 s, then stores the median ratio as Norm_ref. */
-    private fun updateCalibration(tsMs: Long, gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?) {
-        val endMs = calibrationEndMs ?: return
-        val tilt = gravity?.let { TiltCalculator.tiltDegrees(it[0], it[1], it[2]) }
-        val ratio = ModeBFeatures.rawRatio(face, shoulders)
-        if (tilt != null && abs(tilt) <= CAL_MAX_TILT_DEG &&
-            face != null && abs(face.pitch) <= CAL_MAX_PITCH_DEG &&
-            shoulders != null && shoulders.leftLikelihood >= MIN_SHOULDER_LIKELIHOOD &&
-            shoulders.rightLikelihood >= MIN_SHOULDER_LIKELIHOOD && ratio != null
-        ) {
-            calibrationRatios.add(ratio)
-        }
-        btnCalibrate.text = "기준 자세 측정 중… (${calibrationRatios.size}프레임)"
-        if (tsMs < endMs) return
-
-        calibrationEndMs = null
-        btnCalibrate.isEnabled = true
-        btnCalibrate.text = "기준 자세 측정"
-        if (calibrationRatios.size < CAL_MIN_FRAMES) {
-            Toast.makeText(
-                this,
-                "측정 실패: 조건 만족 ${calibrationRatios.size}프레임 (폰 수직 ±15°, 얼굴 pitch ±10°, 양 어깨 검출)",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-        val sorted = calibrationRatios.sorted()
-        val median = if (sorted.size % 2 == 1) sorted[sorted.size / 2] else (sorted[sorted.size / 2 - 1] + sorted[sorted.size / 2]) / 2
-        normRef = median
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putFloat(KEY_NORM_REF, median).apply()
-        Toast.makeText(this, "Norm_ref ${fmt(median)} 저장 (${sorted.size}프레임)", Toast.LENGTH_LONG).show()
     }
 
     private fun startCalibrationC() {
@@ -390,7 +324,6 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         super.onDestroy()
         analysisExecutor.shutdown()
         faceDetector.close()
-        poseDetector.close()
     }
 
     private fun startCamera() {
@@ -444,44 +377,33 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         val uprightHeight = if (rotation % 180 == 0) imageProxy.height else imageProxy.width
 
         val input = InputImage.fromMediaImage(mediaImage, rotation)
-        val faceTask = faceDetector.process(input)
-        val poseTask = poseDetector.process(input)
-        Tasks.whenAllComplete(faceTask, poseTask)
-            .addOnSuccessListener(ContextCompat.getMainExecutor(this)) {
+        faceDetector.process(input)
+            .addOnCompleteListener(ContextCompat.getMainExecutor(this)) { faceTask ->
                 val face = if (faceTask.isSuccessful) {
                     faceTask.result.maxByOrNull { it.boundingBox.width() }?.let { FaceFeatures.from(it) }
                 } else {
                     Log.w(TAG, "Face detection failed", faceTask.exception)
                     null
                 }
-                val shoulders = if (poseTask.isSuccessful) {
-                    ShoulderFeatures.from(poseTask.result)
-                } else {
-                    Log.w(TAG, "Pose detection failed", poseTask.exception)
-                    null
-                }
                 if (focalPx == null) focalPx = arrayFocal?.let { CameraIntrinsics.focalPx(it, bufferWidth, bufferHeight) }
-                updateCalibration(tsMs, gravity, face, shoulders)
                 updateCalibrationC(tsMs, gravity, deviceRotation, face, uprightWidth, uprightHeight)
-                val neckDeg = predictNeck(gravity, face, shoulders)
                 val pose = estimateModeC(tsMs, face, uprightWidth, uprightHeight)
                 val neckC = pose?.let { p -> gravity?.let { modeCFlexion(p, it) } }
                 updateCalibrationG(tsMs, gravity, pose, neckC)
                 val guide = calibrationCText(gravity, deviceRotation) ?: calibrationGText(gravity)
-                showFeatures(face, shoulders, uprightWidth, uprightHeight, neckDeg, guide, pose, neckC)
-                recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders, neckDeg, pose, neckC)
+                showFeatures(face, uprightWidth, uprightHeight, guide, pose, neckC)
+                recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, pose, neckC)
             }
             .addOnCompleteListener { imageProxy.close() }
     }
 
+    /** Mode B columns (shoulders, norm_ref, neck_pred_deg) stay in the header but are always empty. */
     private fun recordFrame(
         tsMs: Long,
         imageWidth: Int,
         imageHeight: Int,
         gravity: FloatArray?,
         face: FaceFeatures?,
-        shoulders: ShoulderFeatures?,
-        neckDeg: Double?,
         pose: FacePose?,
         neckC: Double?,
     ) {
@@ -495,9 +417,9 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                 face?.nose?.x, face?.nose?.y,
                 face?.leftEye?.x, face?.leftEye?.y,
                 face?.rightEye?.x, face?.rightEye?.y,
-                shoulders?.left?.x, shoulders?.left?.y, shoulders?.leftLikelihood,
-                shoulders?.right?.x, shoulders?.right?.y, shoulders?.rightLikelihood,
-                normRef, neckDeg,
+                null, null, null, // sh_l_x, sh_l_y, sh_l_likelihood
+                null, null, null, // sh_r_x, sh_r_y, sh_r_likelihood
+                null, null, // norm_ref, neck_pred_deg
                 face?.mouthLeft?.x, face?.mouthLeft?.y,
                 face?.mouthRight?.x, face?.mouthRight?.y,
                 face?.mouthBottom?.x, face?.mouthBottom?.y,
@@ -528,18 +450,10 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     private fun modeCFlexion(pose: FacePose, gravity: FloatArray): Double =
         ModeCGeometry.headFlexion(pose.rotation, gravity[0], gravity[1], gravity[2]) - faceModel!!.alphaRefDeg
 
-    /** Neck angle (°) from the Watanabe model; null without model, Norm_ref, phone tilt, face or both shoulders. */
-    private fun predictNeck(gravity: FloatArray?, face: FaceFeatures?, shoulders: ShoulderFeatures?): Double? =
-        ModeBFeatures.predictNeck(
-            neckModel, normRef, gravity?.let { TiltCalculator.tiltDegrees(it[0], it[1], it[2]) }, face, shoulders,
-        )
-
     private fun showFeatures(
         face: FaceFeatures?,
-        shoulders: ShoulderFeatures?,
         imageWidth: Int,
         imageHeight: Int,
-        neckDeg: Double?,
         calibrationCText: String?,
         pose: FacePose?,
         neckC: Double?,
@@ -547,27 +461,14 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         overlayView.setPoints(
             imageWidth,
             imageHeight,
-            listOfNotNull(face?.nose, face?.leftEye, face?.rightEye, shoulders?.left, shoulders?.right, shoulders?.neck),
+            face?.let { (it.modeCLandmarks() + it.center).filterNotNull() } ?: emptyList(),
         )
-        val eyeDist = face?.eyeDistance()
         val faceText = if (face == null) {
             "얼굴: 없음"
         } else {
-            "얼굴 pitch ${fmt(face.pitch)}° · yaw ${fmt(face.yaw)}° · roll ${fmt(face.roll)}°\n" +
-                "눈 사이 거리: ${eyeDist?.let { fmt(it) + " px" } ?: "-"} (${imageWidth}×${imageHeight})"
+            "얼굴 pitch ${fmt(face.pitch)}° · yaw ${fmt(face.yaw)}° · roll ${fmt(face.roll)}°"
         }
-        val shoulderText = if (shoulders == null) {
-            "어깨: 없음"
-        } else {
-            "어깨 신뢰도 L ${fmt(shoulders.leftLikelihood)} · R ${fmt(shoulders.rightLikelihood)}\n" +
-                "코–목 / 눈 사이: ${ModeBFeatures.rawRatio(face, shoulders)?.let { fmt(it) } ?: "-"}"
-        }
-        tvFeatures.text = (calibrationCText?.let { it + "\n" } ?: "") + faceText + "\n" + shoulderText + "\nNorm_ref: ${normRef?.let { fmt(it) } ?: "미설정"}" +
-            "\n목 각도: " + when {
-                neckModel == null -> "모델 파일 없음"
-                neckDeg == null -> "-"
-                else -> String.format(Locale.US, "%.1f°", neckDeg)
-            } +
+        tvFeatures.text = (calibrationCText?.let { it + "\n" } ?: "") + faceText +
             "\n모드 C: " + when {
                 faceModel == null -> "캘리브레이션 필요"
                 pose == null -> "-"
@@ -583,14 +484,8 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     companion object {
         private const val TAG = "NeckCollectActivity"
         private const val PREFS = ModeBFeatures.PREFS
-        private const val KEY_NORM_REF = ModeBFeatures.KEY_NORM_REF
-        private const val CALIBRATION_MS = 3000L
-        private const val CAL_MAX_TILT_DEG = 15.0
-        private const val CAL_MAX_PITCH_DEG = 10f
-        private const val CAL_MIN_FRAMES = 5
         /** A mode C pose newer than this (ms) starts the next frame's PnP. */
         private const val POSE_REUSE_MS = 500L
-        private const val MIN_SHOULDER_LIKELIHOOD = ModeBFeatures.MIN_SHOULDER_LIKELIHOOD
         /** Shown during the g() calibration so the user looks at the screen as when reading. */
         private const val READING_TEXT =
             "오래 앉아 있으면 목과 어깨가 굳기 쉽습니다. 한 시간에 한 번쯤 일어나서 어깨를 천천히 돌리고, " +
