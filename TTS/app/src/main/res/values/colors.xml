@@ -1,10 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- iOS-style tokens, mirrored from design-system/styles.css. Dark values in values-night/colors.xml. -->
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="tint">#FF0066D6</color>
+    <color name="on_tint">#FFFFFFFF</color>
+    <color name="tint_ink">#FF0066D6</color>
+
+    <color name="red">#FFD70015</color>
+    <color name="green">#FF1F7A35</color>
+    <color name="green_dot">#FF28A745</color>
+    <color name="orange">#FFC93400</color>
+    <color name="gray">#FF8E8E93</color>
+
+    <color name="label">#FF000000</color>
+    <color name="secondary_label">#FF6C6C70</color>
+    <color name="tertiary_label">#FF8E8E93</color>
+
+    <color name="grouped_bg">#FFF2F2F7</color>
+    <color name="secondary_grouped_bg">#FFFFFFFF</color>
+    <color name="separator">#FFC6C6C8</color>
+    <color name="track">#FFE5E5EA</color>
+    <color name="pressed_fill">#14747480</color>
+    <color name="thumb">#FFFFFFFF</color>
 </resources>

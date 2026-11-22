@@ -50,6 +50,13 @@ class SedentaryTracker(context: Context) {
         commit(System.currentTimeMillis(), isStill(), monitoring = false)
     }
 
+    fun resetDebt() {
+        prefs.edit {
+            putFloat(KEY_BASE_DEBT, 0f)
+            putLong(KEY_ANCHOR_TIME, System.currentTimeMillis())
+        }
+    }
+
     /** Current D_s (minutes-equivalent debt units), evaluated lazily. */
     fun getDebt(): Double = debtAt(System.currentTimeMillis())
 

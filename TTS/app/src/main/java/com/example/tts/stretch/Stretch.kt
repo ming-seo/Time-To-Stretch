@@ -15,6 +15,7 @@ import androidx.core.content.edit
 import com.example.tts.ActivityTransitionReceiver
 import com.example.tts.MainActivity
 import com.example.tts.SedentaryTracker
+import com.example.tts.neck.NeckDebtCalculator
 import com.example.tts.neck.NeckSensingService
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityTransition
@@ -88,6 +89,20 @@ object Stretch {
         if (combined >= THRESHOLD && now - lastNotified >= COOLDOWN_MS) {
             notifyStretch(context, dn, ds, combined)
             prefs.edit { putLong(KEY_LAST_NOTIFIED_AT, now) }
+        }
+    }
+
+    /**
+     * Zeroes D_n, D_s and D and the reminder cooldown. Call only while the service is stopped:
+     * NeckSensingService keeps D_n in memory and would write the old value back on its next cycle.
+     */
+    fun resetDebts(context: Context) {
+        context.getSharedPreferences(NeckDebtCalculator.PREFS, Context.MODE_PRIVATE)
+            .edit { putFloat(NeckDebtCalculator.KEY_DEBT, 0f) }
+        SedentaryTracker(context).resetDebt()
+        prefs(context).edit {
+            putFloat(KEY_LAST_D, 0f)
+            remove(KEY_LAST_NOTIFIED_AT)
         }
     }
 

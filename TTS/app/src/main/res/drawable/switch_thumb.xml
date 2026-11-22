@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 27dp white knob inside the 31dp track (2dp inset all around). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:inset="2dp">
+    <shape android:shape="oval">
+        <solid android:color="@color/thumb" />
+        <stroke android:width="0.5dp" android:color="#1F000000" />
+        <size android:width="27dp" android:height="27dp" />
+    </shape>
+</inset>

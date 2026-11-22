@@ -1,77 +1,358 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Home, per design-system/concept.html "First view": large title, one focal card, inset-grouped lists. -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp">
-
-    <TextView
-        android:id="@+id/tvServiceStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:text="백그라운드 측정 꺼짐" />
-
-    <Button
-        android:id="@+id/btnToggleMonitoring"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="백그라운드 측정 시작" />
-
-    <TextView
-        android:id="@+id/tvDebts"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:fontFamily="monospace"
-        android:textSize="15sp"
-        android:text="-" />
-
-    <Button
-        android:id="@+id/btnOpenNeck"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="목 각도 디버그 화면" />
+    android:background="@color/grouped_bg"
+    android:clipToPadding="true"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:paddingTop="36dp"
+        android:paddingBottom="32dp">
 
         <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="전환 이벤트 로그"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnClearLog"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="로그 지우기" />
-
-    </LinearLayout>
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="8dp">
-
-        <TextView
-            android:id="@+id/tvLog"
+            style="@style/Text.TTS.LargeTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:textSize="13sp"
-            android:text="(아직 이벤트 없음)" />
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:accessibilityHeading="true"
+            android:text="자세 관리" />
 
-    </ScrollView>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="top"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
 
-</LinearLayout>
+            <View
+                android:id="@+id/statusDot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginTop="7dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_status_dot" />
+
+            <TextView
+                android:id="@+id/tvStatus"
+                style="@style/Text.TTS.Subheadline"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="꺼짐" />
+        </LinearLayout>
+
+        <!-- Focal card: progress toward the stretch reminder -->
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.TTS.InsetGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    style="@style/Text.TTS.Footnote"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="스트레칭 알림까지" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="10dp"
+                    android:baselineAligned="true"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvTotal"
+                        style="@style/Text.TTS.Title1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.0" />
+
+                    <TextView
+                        android:id="@+id/tvThreshold"
+                        style="@style/Text.TTS.Subheadline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="/ 30" />
+                </LinearLayout>
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/progressTotal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="1000"
+                    app:indicatorColor="@color/tint"
+                    app:trackColor="@color/track"
+                    app:trackCornerRadius="4dp"
+                    app:trackThickness="8dp" />
+
+                <TextView
+                    android:id="@+id/tvTotalCaption"
+                    style="@style/Text.TTS.Footnote"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="목 기울기와 앉은 시간 부담의 합이 30이 되면 알림이 와요" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Section: monitoring -->
+        <TextView
+            style="@style/Text.TTS.SectionHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="측정" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.TTS.InsetGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/rowMonitoring"
+                style="@style/Widget.TTS.Row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <ImageView
+                    style="@style/Widget.TTS.IconTile"
+                    android:backgroundTint="@color/green_dot"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_activity" />
+
+                <TextView
+                    style="@style/Text.TTS.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:labelFor="@id/switchMonitoring"
+                    android:text="백그라운드 측정" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchMonitoring"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="백그라운드 측정"
+                    android:minHeight="44dp"
+                    android:saveEnabled="false"
+                    android:thumb="@drawable/switch_thumb"
+                    app:switchMinWidth="51dp"
+                    app:track="@drawable/switch_track" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/Text.TTS.SectionFooter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="앱을 닫아도 휴대폰이 목 기울기와 앉아 있는 시간을 계속 잽니다." />
+
+        <!-- Section: current load -->
+        <TextView
+            style="@style/Text.TTS.SectionHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="현재 부담" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.TTS.InsetGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    style="@style/Widget.TTS.Row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <ImageView
+                        style="@style/Widget.TTS.IconTile"
+                        android:backgroundTint="@color/tint"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_smartphone" />
+
+                    <TextView
+                        style="@style/Text.TTS.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="목 기울기" />
+
+                    <TextView
+                        android:id="@+id/tvNeckDebt"
+                        style="@style/Text.TTS.Value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.0" />
+                </LinearLayout>
+
+                <View
+                    style="@style/Widget.TTS.Separator"
+                    android:layout_width="match_parent"
+                    android:layout_marginStart="57dp" />
+
+                <LinearLayout
+                    style="@style/Widget.TTS.Row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <ImageView
+                        style="@style/Widget.TTS.IconTile"
+                        android:backgroundTint="@color/orange"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_armchair" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/Text.TTS.Body"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="앉은 시간" />
+
+                        <TextView
+                            android:id="@+id/tvSitState"
+                            style="@style/Text.TTS.Footnote"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="측정 꺼짐" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvSitDebt"
+                        style="@style/Text.TTS.Value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.0" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/tvLastEval"
+            style="@style/Text.TTS.SectionFooter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="아직 계산하지 않았어요" />
+
+        <!-- Tools -->
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.TTS.InsetGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/rowOpenNeck"
+                    style="@style/Widget.TTS.Row.Tappable"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <TextView
+                        style="@style/Text.TTS.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="목 각도 디버그" />
+
+                    <ImageView
+                        android:layout_width="17dp"
+                        android:layout_height="17dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron_right" />
+                </LinearLayout>
+
+                <View
+                    style="@style/Widget.TTS.Separator"
+                    android:layout_width="match_parent"
+                    android:layout_marginStart="16dp" />
+
+                <TextView
+                    android:id="@+id/rowResetDebts"
+                    style="@style/Widget.TTS.Row.Tappable"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="D 값 초기화"
+                    android:textColor="@color/red"
+                    android:textSize="17sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Transition log -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="bottom"
+            android:orientation="horizontal"
+            android:paddingStart="32dp"
+            android:paddingEnd="20dp">
+
+            <TextView
+                style="@style/Text.TTS.Footnote"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:paddingBottom="7dp"
+                android:text="활동 전환 기록" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnClearLog"
+                style="@style/Widget.TTS.Button.Plain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="지우기" />
+        </LinearLayout>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.TTS.InsetGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/tvLog"
+                style="@style/Text.TTS.Subheadline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFeatureSettings="tnum"
+                android:lineSpacingExtra="6dp"
+                android:padding="16dp"
+                android:text="아직 기록이 없어요" />
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
