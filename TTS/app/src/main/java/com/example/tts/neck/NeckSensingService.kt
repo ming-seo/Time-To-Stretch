@@ -159,6 +159,8 @@ class NeckSensingService : Service(), SensorEventListener {
         logger.logWindow(window)
         maybeStartSample(window)
         if (cycle != null) {
+            // Re-read: the g() calibration on the collection screen may have replaced it (design doc §11.11).
+            mapping = NeckMapping.load(prefs())
             val gCata = cycle.cata?.let { mapping.predict(it) }
             val neck = estimator.estimate(cycle, mapping)
             val state = debtCalculator.judge(cycle, neck?.deg)
@@ -185,7 +187,7 @@ class NeckSensingService : Service(), SensorEventListener {
             logger.logSample(sample)
             NeckLiveState.lastSample = sample
             if (sample.ok) {
-                mapping = mapping.add(sample.phoneTilt!!, sample.neckDeg!!)
+                mapping = NeckMapping.load(prefs()).add(sample.phoneTilt!!, sample.neckDeg!!)
                 mapping.save(prefs())
                 estimator.onSample(sample)
             }
@@ -253,8 +255,8 @@ class NeckSensingService : Service(), SensorEventListener {
         private const val WINDOW_MS = 5_000L
         private const val SAMPLE_INTERVAL_MS = 120_000L
         /** Which camera estimate the stored g() was fitted on; anything else is cleared once on start. */
-        private const val KEY_G_SOURCE = "g_source"
-        private const val G_SOURCE_MODE_C = "C"
+        const val KEY_G_SOURCE = "g_source"
+        const val G_SOURCE_MODE_C = "C"
         private const val LOW_PASS_ALPHA = 0.8f
         private const val CHANNEL_ID = "neck_sensing"
         private const val NOTIFICATION_ID = 2001
