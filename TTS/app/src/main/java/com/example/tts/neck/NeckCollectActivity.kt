@@ -102,10 +102,10 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
         btnRecord.setOnClickListener { if (recorder == null) startRecording() else stopRecording() }
         btnCalibrateC = findViewById(R.id.btnCalibrateC)
-        btnCalibrateC.setOnClickListener { if (calibrationC == null) startCalibrationC() else stopCalibrationC("모드 C 캘리브레이션 취소") }
+        btnCalibrateC.setOnClickListener { if (calibrationC == null) startCalibrationC() else stopCalibrationC("머리 각도 인식 등록 취소") }
         faceModel = FaceModel.load(getSharedPreferences(PREFS, MODE_PRIVATE))
         btnCalibrateG = findViewById(R.id.btnCalibrateG)
-        btnCalibrateG.setOnClickListener { if (calibrationG == null) startCalibrationG() else stopCalibrationG("g() 캘리브레이션 취소") }
+        btnCalibrateG.setOnClickListener { if (calibrationG == null) startCalibrationG() else stopCalibrationG("폰-머리 각도 보정 등록 취소") }
         arrayFocal = CameraIntrinsics.frontArrayFocal(this)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -162,9 +162,9 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
     private fun startCalibrationC() {
         val message = when {
-            calibrationG != null -> "g() 캘리브레이션 중에는 시작할 수 없습니다"
-            sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) == null -> "회전 벡터 센서가 없어 모드 C 캘리브레이션을 할 수 없습니다"
-            arrayFocal == null -> "카메라 초점 거리를 읽지 못해 모드 C 캘리브레이션을 할 수 없습니다"
+            calibrationG != null -> "폰-머리 각도 보정 등록 중에는 시작할 수 없습니다"
+            sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) == null -> "회전 벡터 센서가 없어 머리 각도 인식 등록을 할 수 없습니다"
+            arrayFocal == null -> "카메라 초점 거리를 읽지 못해 머리 각도 인식 등록을 할 수 없습니다"
             else -> null
         }
         if (message != null) {
@@ -172,12 +172,12 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
             return
         }
         calibrationC = ModeCCalibration()
-        btnCalibrateC.text = "모드 C 캘리브레이션 취소"
+        btnCalibrateC.text = "등록 취소"
     }
 
     private fun stopCalibrationC(message: String?) {
         calibrationC = null
-        btnCalibrateC.text = "모드 C 캘리브레이션"
+        btnCalibrateC.text = "머리 각도 인식 등록"
         message?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
     }
 
@@ -237,16 +237,16 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
             "얼굴 pitch ${label?.let { fmtD(it.first) } ?: "-"}° / yaw ${label?.let { fmtD(it.second) } ?: "-"}° " +
                 "(목표 ${fmtD(step.pitch)}° / ${fmtD(step.yaw)}°)"
         }
-        return "[모드 C 캘리브레이션 ${cal.results.size + 1}/${CalibrationStep.entries.size}] ${step.label}\n" +
+        return "[머리 각도 인식 등록 ${cal.results.size + 1}/${CalibrationStep.entries.size}] ${step.label}\n" +
             "뒤통수를 벽에 붙여 머리를 고정하고, 폰을 이 위치에서 얼굴이 화면 가운데 오도록 드세요\n" +
             "$now · 모은 프레임 ${cal.collectedFrames}"
     }
 
     private fun startCalibrationG() {
         val message = when {
-            calibrationC != null -> "모드 C 캘리브레이션 중에는 시작할 수 없습니다"
-            faceModel == null -> "모드 C 캘리브레이션을 먼저 해 주세요"
-            arrayFocal == null -> "카메라 초점 거리를 읽지 못해 g() 캘리브레이션을 할 수 없습니다"
+            calibrationC != null -> "머리 각도 인식 등록 중에는 시작할 수 없습니다"
+            faceModel == null -> "머리 각도 인식 등록을 먼저 해 주세요"
+            arrayFocal == null -> "카메라 초점 거리를 읽지 못해 폰-머리 각도 보정 등록을 할 수 없습니다"
             else -> null
         }
         if (message != null) {
@@ -254,12 +254,12 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
             return
         }
         calibrationG = GCalibration()
-        btnCalibrateG.text = "g() 캘리브레이션 취소"
+        btnCalibrateG.text = "등록 취소"
     }
 
     private fun stopCalibrationG(message: String?) {
         calibrationG = null
-        btnCalibrateG.text = "g() 캘리브레이션"
+        btnCalibrateG.text = "폰-머리 각도 보정 등록"
         message?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
     }
 
@@ -313,7 +313,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
             ""
         }
         val tilt = gravity?.let { fmtD(TiltCalculator.tiltDegrees(it[0], it[1], it[2])) } ?: "-"
-        return "[g() 캘리브레이션 ${index + 1}/${cal.steps.size}] 목표 폰 기울기 ${fmtD(step.targetDeg)}°$lower\n" +
+        return "[폰-머리 각도 보정 등록 ${index + 1}/${cal.steps.size}] 목표 폰 기울기 ${fmtD(step.targetDeg)}°$lower\n" +
             "바로 앉아 폰 기울기만 맞추고, 아래 글을 편하게 읽으세요\n" +
             "지금 폰 기울기 $tilt° · 모은 프레임 ${cal.collectedFrames}\n\n" + READING_TEXT
     }
@@ -470,7 +470,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         }
         tvFeatures.text = (calibrationCText?.let { it + "\n" } ?: "") + faceText +
             "\n모드 C: " + when {
-                faceModel == null -> "캘리브레이션 필요"
+                faceModel == null -> "머리 각도 인식 등록 필요"
                 pose == null -> "-"
                 else -> "얼굴 pitch ${fmtD(pose.pitchDeg)}° · yaw ${fmtD(pose.yawDeg)}° · ${fmtD(pose.distCm)} cm · " +
                     "오차 ${fmtD(pose.reprojRms)} px\n머리 숙임 θ_C: ${neckC?.let { fmtD(it) + "°" } ?: "-"}"

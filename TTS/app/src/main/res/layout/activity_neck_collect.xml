@@ -33,14 +33,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
-        android:text="모드 C 캘리브레이션" />
+        android:text="머리 각도 인식 등록" />
 
     <Button
         android:id="@+id/btnCalibrateG"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
-        android:text="g() 캘리브레이션" />
+        android:text="폰-머리 각도 보정 등록" />
 
     <Button
         android:id="@+id/btnRecord"
