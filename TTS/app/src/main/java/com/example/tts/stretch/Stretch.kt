@@ -43,8 +43,8 @@ object Stretch {
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
 
     /**
-     * The service's own start/stop also sets [KEY_ENABLED], so starting or stopping from any screen
-     * (this app's home or NeckActivity) leaves one consistent on/off state. A process kill skips
+     * The service's own start/stop also sets [KEY_ENABLED], so however it is started or stopped
+     * the on/off state stays consistent. A process kill skips
      * onDestroy, so the flag stays on and the service comes back via START_STICKY or [BootReceiver].
      * Some OEMs (Samsung) do run onDestroy at power-off, so a stop after [onShutdown] keeps the flag.
      */

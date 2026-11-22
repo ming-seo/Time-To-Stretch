@@ -6,16 +6,9 @@
     android:padding="24dp">
 
     <Button
-        android:id="@+id/btnToggleSensing"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="측정 시작" />
-
-    <Button
         android:id="@+id/btnOpenCollect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
         android:text="자세 데이터 수집" />
 
     <TextView
