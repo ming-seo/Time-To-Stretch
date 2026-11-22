@@ -64,6 +64,8 @@ class NeckCameraSampler(
     private val burstMs: Long = 3_000L,
     private val fps: Int = 5,
     private val minValidFrames: Int = 5,
+    /** Called on the main thread with θ_C of each valid frame. */
+    private val onFrameNeck: (Double) -> Unit = {},
 ) : LifecycleOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.CREATED }
@@ -187,11 +189,13 @@ class NeckCameraSampler(
                 val g = gravity() ?: return@addOnSuccessListener
                 if (pose.reprojRms > FaceModel.MAX_RMS_PX) return@addOnSuccessListener
                 b.tilts += TiltCalculator.tiltDegrees(g[0], g[1], g[2])
-                b.necks += ModeCGeometry.headFlexion(pose.rotation, g[0], g[1], g[2]) - b.model.alphaRefDeg
+                val neck = ModeCGeometry.headFlexion(pose.rotation, g[0], g[1], g[2]) - b.model.alphaRefDeg
+                b.necks += neck
                 b.pitches += face.pitch.toDouble()
                 b.cPitches += pose.pitchDeg
                 b.dists += pose.distCm
                 b.reprojs += pose.reprojRms
+                onFrameNeck(neck)
             }
             .addOnCompleteListener { imageProxy.close() }
     }

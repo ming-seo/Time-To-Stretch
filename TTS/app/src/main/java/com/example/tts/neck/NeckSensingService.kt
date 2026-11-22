@@ -76,7 +76,10 @@ class NeckSensingService : Service(), SensorEventListener {
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         defaultDisplay = (getSystemService(DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)
         logger = NeckCsvLogger(this)
-        sampler = NeckCameraSampler(this, gravity = { latestGravity })
+        sampler = NeckCameraSampler(this, gravity = { latestGravity }, onFrameNeck = { neck ->
+            NeckLiveState.frameThetaC = neck
+            NeckLiveState.frameThetaCMs = System.currentTimeMillis()
+        })
         debt = prefs().getFloat(NeckDebtCalculator.KEY_DEBT, 0f).toDouble()
         mapping = NeckMapping.load(prefs())
         if (prefs().getString(KEY_G_SOURCE, null) != G_SOURCE_MODE_C) {
@@ -114,6 +117,7 @@ class NeckSensingService : Service(), SensorEventListener {
         aggregator.reset()
         NeckLiveState.running = false
         NeckLiveState.currentTilt = null
+        NeckLiveState.frameThetaC = null
         super.onDestroy()
     }
 
@@ -163,6 +167,8 @@ class NeckSensingService : Service(), SensorEventListener {
             logger.logCycle(cycle, state, debt, gCata, if (gCata != null) mapping.residualStd else null, neck)
             NeckLiveState.lastCycle = cycle
             NeckLiveState.lastState = state
+            NeckLiveState.lastCycleSample = NeckLiveState.lastSample?.takeIf { it.startMs >= cycle.startMs && it.startMs < cycle.endMs }
+            NeckLiveState.lastNeck = neck
         }
     }
 
