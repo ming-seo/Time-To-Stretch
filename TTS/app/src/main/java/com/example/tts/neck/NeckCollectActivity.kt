@@ -74,6 +74,10 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     private var lastPose: FacePose? = null
     private var lastPoseMs = 0L
 
+    private lateinit var btnCalibrateG: Button
+    /** g() calibration in progress (design doc §11.11); null when not calibrating. */
+    private var calibrationG: GCalibration? = null
+
     /** Latest gravity vector; replaced (not mutated) so the analysis thread reads a consistent copy. */
     @Volatile
     private var latestGravity: FloatArray? = null
@@ -123,6 +127,8 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         btnCalibrateC = findViewById(R.id.btnCalibrateC)
         btnCalibrateC.setOnClickListener { if (calibrationC == null) startCalibrationC() else stopCalibrationC("모드 C 캘리브레이션 취소") }
         faceModel = FaceModel.load(getSharedPreferences(PREFS, MODE_PRIVATE))
+        btnCalibrateG = findViewById(R.id.btnCalibrateG)
+        btnCalibrateG.setOnClickListener { if (calibrationG == null) startCalibrationG() else stopCalibrationG("g() 캘리브레이션 취소") }
         arrayFocal = CameraIntrinsics.frontArrayFocal(this)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -150,6 +156,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         btnCalibrate.isEnabled = true
         btnCalibrate.text = "기준 자세 측정"
         if (calibrationC != null) stopCalibrationC(null)
+        if (calibrationG != null) stopCalibrationG(null)
         lastPose = null
     }
 
@@ -221,6 +228,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
 
     private fun startCalibrationC() {
         val message = when {
+            calibrationG != null -> "g() 캘리브레이션 중에는 시작할 수 없습니다"
             sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) == null -> "회전 벡터 센서가 없어 모드 C 캘리브레이션을 할 수 없습니다"
             arrayFocal == null -> "카메라 초점 거리를 읽지 못해 모드 C 캘리브레이션을 할 수 없습니다"
             else -> null
@@ -298,6 +306,82 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         return "[모드 C 캘리브레이션 ${cal.results.size + 1}/${CalibrationStep.entries.size}] ${step.label}\n" +
             "뒤통수를 벽에 붙여 머리를 고정하고, 폰을 이 위치에서 얼굴이 화면 가운데 오도록 드세요\n" +
             "$now · 모은 프레임 ${cal.collectedFrames}"
+    }
+
+    private fun startCalibrationG() {
+        val message = when {
+            calibrationC != null -> "모드 C 캘리브레이션 중에는 시작할 수 없습니다"
+            faceModel == null -> "모드 C 캘리브레이션을 먼저 해 주세요"
+            arrayFocal == null -> "카메라 초점 거리를 읽지 못해 g() 캘리브레이션을 할 수 없습니다"
+            else -> null
+        }
+        if (message != null) {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            return
+        }
+        calibrationG = GCalibration()
+        btnCalibrateG.text = "g() 캘리브레이션 취소"
+    }
+
+    private fun stopCalibrationG(message: String?) {
+        calibrationG = null
+        btnCalibrateG.text = "g() 캘리브레이션"
+        message?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
+    }
+
+    /** Feeds one frame to the g() calibration (design doc §11.11); after the last step replaces the stored g(). */
+    private fun updateCalibrationG(tsMs: Long, gravity: FloatArray?, pose: FacePose?, neckC: Double?) {
+        val cal = calibrationG ?: return
+        val tilt = gravity?.let { TiltCalculator.tiltDegrees(it[0], it[1], it[2]) }
+        when (cal.onFrame(tsMs, tilt, neckC, pose?.reprojRms)) {
+            GCalibration.Status.TIMEOUT -> {
+                val r = cal.lastRejects!!
+                val text = if (r.onTarget == 0) {
+                    "폰 기울기를 ${fmtD(cal.step.targetDeg)}° ±${fmtD(GCalibration.TILT_TOLERANCE_DEG)}° 에 맞춰 주세요"
+                } else {
+                    "${fmtD(cal.step.targetDeg)}°: 기울기가 맞은 ${r.onTarget}프레임 중 얼굴 없음 ${r.noFace}, 재투영 오차 초과 ${r.highRms}"
+                }
+                Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+            }
+            GCalibration.Status.STEP_DONE -> {
+                val last = cal.results.last()
+                Toast.makeText(this, "${fmtD(last.step.targetDeg)}° 완료 (θ_C ${fmtD(last.thetaC)}°)", Toast.LENGTH_SHORT).show()
+            }
+            GCalibration.Status.ALL_DONE -> finishCalibrationG(cal)
+            else -> Unit
+        }
+    }
+
+    private fun finishCalibrationG(cal: GCalibration) {
+        stopCalibrationG(null)
+        val mapping = cal.mapping()
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        mapping.save(prefs)
+        prefs.edit().putString(NeckSensingService.KEY_G_SOURCE, NeckSensingService.G_SOURCE_MODE_C).apply()
+        val name = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        GCalibration.writeCsv(NeckCsvLogger.logDir(this), name, cal.results, mapping)
+        Toast.makeText(
+            this,
+            "g() 저장: θ_C ≈ ${mapping.slope?.let { fmtD(it) } ?: "-"}·θ_phone + ${mapping.intercept?.let { fmtD(it) } ?: "-"} " +
+                "(잔차 ${mapping.residualStd?.let { fmtD(it) } ?: "-"}°)",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+
+    /** Guidance for the current g() calibration step; null when not calibrating. */
+    private fun calibrationGText(gravity: FloatArray?): String? {
+        val cal = calibrationG ?: return null
+        val step = cal.step
+        val index = cal.results.size
+        val lower = if (step.round > 1 && index == GCalibration.TARGETS_DEG.size && cal.collectedFrames == 0) {
+            "\n폰을 한 번 내려놓았다가 다시 드세요"
+        } else {
+            ""
+        }
+        val tilt = gravity?.let { fmtD(TiltCalculator.tiltDegrees(it[0], it[1], it[2])) } ?: "-"
+        return "[g() 캘리브레이션 ${index + 1}/${cal.steps.size}] 목표 폰 기울기 ${fmtD(step.targetDeg)}°$lower\n" +
+            "바로 앉아 폰 기울기만 맞추고, 아래 글을 편하게 읽으세요\n" +
+            "지금 폰 기울기 $tilt° · 모은 프레임 ${cal.collectedFrames}\n\n" + READING_TEXT
     }
 
     private fun PointF.toXY() = doubleArrayOf(x.toDouble(), y.toDouble())
@@ -382,7 +466,9 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
                 val neckDeg = predictNeck(gravity, face, shoulders)
                 val pose = estimateModeC(tsMs, face, uprightWidth, uprightHeight)
                 val neckC = pose?.let { p -> gravity?.let { modeCFlexion(p, it) } }
-                showFeatures(face, shoulders, uprightWidth, uprightHeight, neckDeg, calibrationCText(gravity, deviceRotation), pose, neckC)
+                updateCalibrationG(tsMs, gravity, pose, neckC)
+                val guide = calibrationCText(gravity, deviceRotation) ?: calibrationGText(gravity)
+                showFeatures(face, shoulders, uprightWidth, uprightHeight, neckDeg, guide, pose, neckC)
                 recordFrame(tsMs, uprightWidth, uprightHeight, gravity, face, shoulders, neckDeg, pose, neckC)
             }
             .addOnCompleteListener { imageProxy.close() }
@@ -505,5 +591,9 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
         /** A mode C pose newer than this (ms) starts the next frame's PnP. */
         private const val POSE_REUSE_MS = 500L
         private const val MIN_SHOULDER_LIKELIHOOD = ModeBFeatures.MIN_SHOULDER_LIKELIHOOD
+        /** Shown during the g() calibration so the user looks at the screen as when reading. */
+        private const val READING_TEXT =
+            "오래 앉아 있으면 목과 어깨가 굳기 쉽습니다. 한 시간에 한 번쯤 일어나서 어깨를 천천히 돌리고, " +
+                "고개를 좌우로 기울여 목 옆을 늘려 주세요. 화면을 볼 때는 폰을 눈높이에 가깝게 들면 목에 가는 부담이 줄어듭니다."
     }
 }
