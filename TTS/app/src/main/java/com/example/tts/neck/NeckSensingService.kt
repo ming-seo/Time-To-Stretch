@@ -23,6 +23,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.view.Display
 import androidx.core.app.NotificationCompat
+import com.example.tts.AppLanguage
 import com.example.tts.R
 import com.example.tts.stretch.Stretch
 import kotlin.math.sqrt
@@ -241,12 +242,13 @@ class NeckSensingService : Service(), SensorEventListener {
     }
 
     private fun startInForeground() {
-        val channel = NotificationChannel(CHANNEL_ID, getString(R.string.channel_tracking), NotificationManager.IMPORTANCE_LOW)
+        val localized = AppLanguage.wrap(this)
+        val channel = NotificationChannel(CHANNEL_ID, localized.getString(R.string.channel_tracking), NotificationManager.IMPORTANCE_LOW)
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(getString(R.string.tracking_notification_title))
-            .setContentText(getString(R.string.tracking_notification_text))
+            .setContentTitle(localized.getString(R.string.tracking_notification_title))
+            .setContentText(localized.getString(R.string.tracking_notification_text))
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

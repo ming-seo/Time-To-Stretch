@@ -10,6 +10,7 @@
     <string name="cancel">Cancel</string>
 
     <!-- Main screen -->
+    <string name="language_toggle">한국어</string>
     <string name="main_title">Time to Stretch</string>
     <string name="status_off">Off</string>
     <string name="status_off_detail">Turn on tracking below</string>

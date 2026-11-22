@@ -94,6 +94,7 @@ class NeckCollectActivity : AppCompatActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_neck_collect)
+        setTitle(R.string.collect_title)
         previewView = findViewById(R.id.previewView)
         overlayView = findViewById(R.id.overlayView)
         tvFeatures = findViewById(R.id.tvFeatures)

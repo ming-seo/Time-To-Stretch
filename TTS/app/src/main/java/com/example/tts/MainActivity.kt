@@ -103,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.rowOpenNeck).setOnClickListener {
             startActivity(Intent(this, NeckActivity::class.java))
         }
+        findViewById<View>(R.id.btnLanguage).setOnClickListener { AppLanguage.toggle(this) }
         findViewById<View>(R.id.rowResetDebts).setOnClickListener { confirmResetDebts() }
         findViewById<View>(R.id.btnClearLog).setOnClickListener {
             tracker.clearLog()

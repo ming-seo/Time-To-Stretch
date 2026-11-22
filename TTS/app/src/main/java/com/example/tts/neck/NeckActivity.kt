@@ -31,6 +31,7 @@ class NeckActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_neck)
+        setTitle(R.string.neck_title)
 
         tvTilt = findViewById(R.id.tvTilt)
         tvThetaC = findViewById(R.id.tvThetaC)

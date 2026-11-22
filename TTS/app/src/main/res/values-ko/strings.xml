@@ -9,6 +9,7 @@
     <string name="cancel">취소</string>
 
     <!-- Main screen -->
+    <string name="language_toggle">English</string>
     <string name="main_title">자세 관리</string>
     <string name="status_off">꺼짐</string>
     <string name="status_off_detail">아래에서 측정을 켜 주세요</string>

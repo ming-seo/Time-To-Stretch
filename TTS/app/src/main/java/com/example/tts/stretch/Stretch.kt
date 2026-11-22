@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.example.tts.ActivityTransitionReceiver
+import com.example.tts.AppLanguage
 import com.example.tts.MainActivity
 import com.example.tts.R
 import com.example.tts.SedentaryTracker
@@ -147,17 +148,18 @@ object Stretch {
             PackageManager.PERMISSION_GRANTED
         ) return
 
+        val localized = AppLanguage.wrap(context)
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, context.getString(R.string.channel_stretch), NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CHANNEL_ID, localized.getString(R.string.channel_stretch), NotificationManager.IMPORTANCE_DEFAULT)
         )
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        val reason = context.getString(if (W_N * dn >= W_S * ds) R.string.stretch_reason_neck else R.string.stretch_reason_sit)
+        val reason = localized.getString(if (W_N * dn >= W_S * ds) R.string.stretch_reason_neck else R.string.stretch_reason_sit)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle(context.getString(R.string.stretch_title))
+            .setContentTitle(localized.getString(R.string.stretch_title))
             .setContentText("$reason (D = %.1f)".format(combined))
             .setContentIntent(open)
             .setAutoCancel(true)
