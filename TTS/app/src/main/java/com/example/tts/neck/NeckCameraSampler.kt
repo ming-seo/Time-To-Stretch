@@ -20,45 +20,52 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
-import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import com.google.mlkit.vision.pose.PoseDetection
-import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import java.util.concurrent.Executors
 
 /** Result of one periodic camera burst. Medians are over valid frames; null when the burst failed. */
 data class FaceSample(
     val startMs: Long,
     val endMs: Long,
-    /** Frames run through face/pose detection. */
+    /** Frames run through face detection. */
     val frames: Int,
     val faceFrames: Int,
-    /** Frames with a neck angle estimate (face, both shoulders, Norm_ref, model, phone tilt). */
+    /** Frames with a mode C estimate (face model pose with reprojection RMS ≤ [FaceModel.MAX_RMS_PX], gravity). */
     val validFrames: Int,
     val phoneTilt: Double?,
+    /** Mode C head flexion θ_C (°), used as the cycle's neck angle (design doc §11.10). */
     val neckDeg: Double?,
+    /** ML Kit face pitch (°). */
     val facePitch: Double?,
-    /** Population standard deviation of the per-frame neck angles (°); spread of the estimate within the burst. */
+    /** Population standard deviation of the per-frame θ_C (°); spread of the estimate within the burst. */
     val neckStd: Double?,
-    /** null on success; otherwise no_permission, no_model, no_norm_ref, camera_error, too_few_frames, cancelled. */
+    /** null on success; otherwise no_permission, no_face_model, no_focal, camera_error, too_few_frames, cancelled. */
     val failReason: String?,
+    /** Mode C face pitch relative to the camera (°). */
+    val cPitch: Double? = null,
+    /** Camera to eye-midpoint distance (cm). */
+    val cDistCm: Double? = null,
+    /** PnP reprojection RMS (px). */
+    val cReprojPx: Double? = null,
 ) {
     val ok: Boolean get() = failReason == null
 }
 
 /**
- * Mode B measurement from inside [NeckSensingService]: opens the front camera (analysis only, no preview)
- * for [burstMs], runs face/pose detection at about [fps], estimates the neck angle per frame and reports
- * the medians. Runs on the main thread; [phoneTilt] supplies the service's latest tilt for each frame.
+ * Mode C measurement from inside [NeckSensingService] (design doc §11.10): opens the front camera (analysis only,
+ * no preview) for [burstMs], runs face detection at about [fps], estimates θ_C per frame by PnP on the user's
+ * face model and reports the medians. Runs on the main thread; [gravity] supplies the service's latest gravity vector.
  */
 class NeckCameraSampler(
     private val context: Context,
-    private val phoneTilt: () -> Double?,
+    private val gravity: () -> FloatArray?,
     private val burstMs: Long = 3_000L,
     private val fps: Int = 5,
     private val minValidFrames: Int = 5,
+    /** Called on the main thread with θ_C of each valid frame. */
+    private val onFrameNeck: (Double) -> Unit = {},
 ) : LifecycleOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.CREATED }
@@ -72,10 +79,7 @@ class NeckCameraSampler(
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .build()
     )
-    private val poseDetector = PoseDetection.getClient(
-        PoseDetectorOptions.Builder().setDetectorMode(PoseDetectorOptions.STREAM_MODE).build()
-    )
-    private val neckModel: WatanabeNeckModel? = WatanabeNeckModel.load(context)
+    private val arrayFocal: CameraIntrinsics.ArrayFocal? = CameraIntrinsics.frontArrayFocal(context)
 
     private var burst: Burst? = null
     private var provider: ProcessCameraProvider? = null
@@ -84,33 +88,36 @@ class NeckCameraSampler(
 
     val busy: Boolean get() = burst != null
 
-    private class Burst(val startMs: Long, val normRef: Float, val onDone: (FaceSample) -> Unit) {
+    private class Burst(val startMs: Long, val model: FaceModel, val onDone: (FaceSample) -> Unit) {
         var analysis: ImageAnalysis? = null
         var frames = 0
         var faceFrames = 0
+        var lastPose: FacePose? = null
         val tilts = mutableListOf<Double>()
         val necks = mutableListOf<Double>()
         val pitches = mutableListOf<Double>()
+        val cPitches = mutableListOf<Double>()
+        val dists = mutableListOf<Double>()
+        val reprojs = mutableListOf<Double>()
     }
 
     /** Starts one burst; [onDone] is called once on the main thread, also when the burst fails or is cancelled. */
     fun start(onDone: (FaceSample) -> Unit) {
         if (burst != null) return
         val now = System.currentTimeMillis()
-        val normRef = context.getSharedPreferences(ModeBFeatures.PREFS, Context.MODE_PRIVATE)
-            .getFloat(ModeBFeatures.KEY_NORM_REF, Float.NaN).takeUnless { it.isNaN() }
+        val model = FaceModel.load(context.getSharedPreferences(NeckDebtCalculator.PREFS, Context.MODE_PRIVATE))
         val precondition = when {
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ->
                 "no_permission"
-            neckModel == null -> "no_model"
-            normRef == null -> "no_norm_ref"
+            model == null -> "no_face_model"
+            arrayFocal == null -> "no_focal"
             else -> null
         }
         if (precondition != null) {
             onDone(FaceSample(now, now, 0, 0, 0, null, null, null, null, precondition))
             return
         }
-        val b = Burst(now, normRef!!, onDone)
+        val b = Burst(now, model!!, onDone)
         burst = b
         val future = ProcessCameraProvider.getInstance(context)
         future.addListener({
@@ -146,7 +153,7 @@ class NeckCameraSampler(
         burst?.let { finish(it, "cancelled") }
     }
 
-    /** Stops any burst without reporting and releases detectors. Call from the service's onDestroy. */
+    /** Stops any burst without reporting and releases the detector. Call from the service's onDestroy. */
     fun release() {
         burst?.let { stopCamera(it) }
         burst = null
@@ -154,7 +161,6 @@ class NeckCameraSampler(
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         analysisExecutor.shutdown()
         faceDetector.close()
-        poseDetector.close()
     }
 
     @OptIn(ExperimentalGetImage::class)
@@ -166,25 +172,30 @@ class NeckCameraSampler(
             return
         }
         lastFrameMs = now
-        val input = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        val faceTask = faceDetector.process(input)
-        val poseTask = poseDetector.process(input)
-        Tasks.whenAllComplete(faceTask, poseTask)
-            .addOnSuccessListener(ContextCompat.getMainExecutor(context)) {
+        val rotation = imageProxy.imageInfo.rotationDegrees
+        val f = CameraIntrinsics.focalPx(arrayFocal!!, imageProxy.width, imageProxy.height)
+        val uprightWidth = if (rotation % 180 == 0) imageProxy.width else imageProxy.height
+        val uprightHeight = if (rotation % 180 == 0) imageProxy.height else imageProxy.width
+        faceDetector.process(InputImage.fromMediaImage(mediaImage, rotation))
+            .addOnSuccessListener(ContextCompat.getMainExecutor(context)) { faces ->
                 if (burst !== b) return@addOnSuccessListener
                 b.frames++
-                val face = if (faceTask.isSuccessful) {
-                    faceTask.result.maxByOrNull { it.boundingBox.width() }?.let { FaceFeatures.from(it) }
-                } else null
-                val shoulders = if (poseTask.isSuccessful) ShoulderFeatures.from(poseTask.result) else null
-                if (face != null) b.faceFrames++
-                val tilt = phoneTilt()
-                val neck = ModeBFeatures.predictNeck(neckModel, b.normRef, tilt, face, shoulders)
-                if (neck != null && tilt != null && face != null) {
-                    b.tilts += tilt
-                    b.necks += neck
-                    b.pitches += face.pitch.toDouble()
-                }
+                val face = faces.maxByOrNull { it.boundingBox.width() }?.let { FaceFeatures.from(it) } ?: return@addOnSuccessListener
+                b.faceFrames++
+                val landmarks = face.modeCLandmarks().map { p -> p?.let { doubleArrayOf(it.x.toDouble(), it.y.toDouble()) } }
+                val pose = FacePoseSolver.solve(b.model.points, landmarks, f, uprightWidth / 2.0, uprightHeight / 2.0, b.lastPose)
+                    ?: return@addOnSuccessListener
+                b.lastPose = pose
+                val g = gravity() ?: return@addOnSuccessListener
+                if (pose.reprojRms > FaceModel.MAX_RMS_PX) return@addOnSuccessListener
+                b.tilts += TiltCalculator.tiltDegrees(g[0], g[1], g[2])
+                val neck = ModeCGeometry.headFlexion(pose.rotation, g[0], g[1], g[2]) - b.model.alphaRefDeg
+                b.necks += neck
+                b.pitches += face.pitch.toDouble()
+                b.cPitches += pose.pitchDeg
+                b.dists += pose.distCm
+                b.reprojs += pose.reprojRms
+                onFrameNeck(neck)
             }
             .addOnCompleteListener { imageProxy.close() }
     }
@@ -196,6 +207,7 @@ class NeckCameraSampler(
         stopCamera(b)
         val valid = b.necks.size
         val reason = error ?: if (valid < minValidFrames) "too_few_frames" else null
+        val ok = reason == null
         b.onDone(
             FaceSample(
                 startMs = b.startMs,
@@ -203,11 +215,14 @@ class NeckCameraSampler(
                 frames = b.frames,
                 faceFrames = b.faceFrames,
                 validFrames = valid,
-                phoneTilt = if (reason == null) median(b.tilts) else null,
-                neckDeg = if (reason == null) median(b.necks) else null,
-                facePitch = if (reason == null) median(b.pitches) else null,
-                neckStd = if (reason == null) std(b.necks) else null,
+                phoneTilt = if (ok) median(b.tilts) else null,
+                neckDeg = if (ok) median(b.necks) else null,
+                facePitch = if (ok) median(b.pitches) else null,
+                neckStd = if (ok) std(b.necks) else null,
                 failReason = reason,
+                cPitch = if (ok) median(b.cPitches) else null,
+                cDistCm = if (ok) median(b.dists) else null,
+                cReprojPx = if (ok) median(b.reprojs) else null,
             )
         )
     }

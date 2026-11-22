@@ -7,7 +7,10 @@ import com.google.mlkit.vision.pose.Pose
 import com.google.mlkit.vision.pose.PoseLandmark
 import kotlin.math.hypot
 
-/** Face features for mode B: head pose relative to the camera and nose/eye positions (image px). */
+/**
+ * Face features: head pose relative to the camera and landmark positions (image px).
+ * Mode B uses nose and eyes; mode C also uses the mouth and cheek landmarks and the face box center.
+ */
 data class FaceFeatures(
     val pitch: Float,
     val yaw: Float,
@@ -15,7 +18,18 @@ data class FaceFeatures(
     val nose: PointF?,
     val leftEye: PointF?,
     val rightEye: PointF?,
+    val mouthLeft: PointF? = null,
+    val mouthRight: PointF? = null,
+    val mouthBottom: PointF? = null,
+    val leftCheek: PointF? = null,
+    val rightCheek: PointF? = null,
+    /** Center of the face bounding box. */
+    val center: PointF? = null,
 ) {
+    /** Mode C landmarks in [FaceModel.LANDMARKS] order; null entries were not detected. */
+    fun modeCLandmarks(): List<PointF?> =
+        listOf(leftEye, rightEye, nose, mouthLeft, mouthRight, mouthBottom, leftCheek, rightCheek)
+
     fun eyeDistance(): Float? =
         if (leftEye != null && rightEye != null) hypot(leftEye.x - rightEye.x, leftEye.y - rightEye.y) else null
 
@@ -27,6 +41,12 @@ data class FaceFeatures(
             nose = face.getLandmark(FaceLandmark.NOSE_BASE)?.position,
             leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)?.position,
             rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position,
+            mouthLeft = face.getLandmark(FaceLandmark.MOUTH_LEFT)?.position,
+            mouthRight = face.getLandmark(FaceLandmark.MOUTH_RIGHT)?.position,
+            mouthBottom = face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position,
+            leftCheek = face.getLandmark(FaceLandmark.LEFT_CHEEK)?.position,
+            rightCheek = face.getLandmark(FaceLandmark.RIGHT_CHEEK)?.position,
+            center = PointF(face.boundingBox.exactCenterX(), face.boundingBox.exactCenterY()),
         )
     }
 }
