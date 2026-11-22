@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTS · Design System</title>
+<link rel="stylesheet" href="styles.css">
+<script src="theme.js"></script>
+<style>
+/* page chrome only (components/tokens live in styles.css) */
+body{display:flex;background:var(--grouped-bg);color:var(--label)}
+nav.side{position:sticky;top:0;align-self:flex-start;height:100vh;width:220px;flex:0 0 220px;background:var(--secondary-grouped-bg);border-right:.5px solid var(--separator);padding:22px 14px;overflow:auto}
+nav.side .brand{font:700 20px var(--font-display);margin-bottom:16px}
+nav.side a{display:block;padding:6px 10px;border-radius:8px;font-size:13px;color:var(--secondary-label);text-decoration:none}
+nav.side a:hover{background:var(--quaternary-fill);color:var(--tint-ink)}
+nav.side a.concept-link{margin:0 0 6px;padding:10px;font-weight:600;color:var(--on-tint);background:var(--tint);border-radius:10px}
+nav.side .grp{font-size:11px;font-weight:600;color:var(--secondary-label);margin:16px 0 6px 10px}
+main{flex:1;padding:36px 44px 120px;max-width:1080px}
+section{margin-bottom:52px;scroll-margin-top:20px}
+h2.sec{font:700 22px var(--font-display);margin-bottom:6px}
+.sec-desc{color:var(--secondary-label);font-size:14px;margin-bottom:18px;max-width:700px;line-height:1.6}
+.stage{background:var(--secondary-system-bg);border:.5px solid var(--separator);border-radius:var(--r-xl);padding:24px;display:flex;flex-wrap:wrap;gap:26px;align-items:center}
+.stage.col{flex-direction:column;align-items:stretch}
+.phone{width:340px;background:var(--grouped-bg);border-radius:var(--r-xl);overflow:hidden;border:.5px solid var(--separator);padding:12px 0}
+.cell{display:flex;flex-direction:column;align-items:center;gap:8px}
+.spec{font:11px var(--font-mono);color:var(--secondary-label)}
+.colors{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.sw{border:.5px solid var(--separator);border-radius:var(--r-md);overflow:hidden;background:var(--secondary-grouped-bg)}
+.sw .c{height:56px}.sw .m{padding:8px 10px}.sw .n{font-size:12px;font-weight:600}.sw .v{font:11px var(--font-mono);color:var(--secondary-label)}
+.typerow{display:flex;align-items:baseline;gap:18px;padding:10px 0;border-bottom:.5px solid var(--separator)}
+.typerow .tk{width:140px;flex:0 0 140px;font:11px var(--font-mono);color:var(--secondary-label)}
+.sprow{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.sprow .bar{background:var(--tint);height:12px;border-radius:3px}.sprow .lbl{width:170px;font:12px var(--font-mono);color:var(--secondary-label)}
+.iconGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+.iconGrid .it{background:var(--secondary-grouped-bg);border-radius:var(--r-md);padding:14px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.iconGrid .it .nm{font:11px var(--font-mono);color:var(--secondary-label)}
+.matsw{width:150px;height:80px;border-radius:var(--r-lg);display:flex;align-items:flex-end;padding:8px;font:11px var(--font-mono);backdrop-filter:var(--mat-blur)}
+.matbg{background:linear-gradient(90deg,var(--tint) 0 33%,var(--green-dot) 33% 66%,var(--orange) 66%);padding:16px;border-radius:var(--r-lg);display:flex;gap:12px;flex-wrap:wrap}
+
+#topctl{position:fixed;top:16px;right:20px;z-index:50;display:flex;gap:10px;align-items:center}
+#themeSel,#langSel{font:600 12px var(--font-body);border:.5px solid var(--separator);border-radius:8px;padding:8px 10px;background:var(--secondary-grouped-bg);color:var(--secondary-label)}
+.ds-btn{font:600 12px var(--font-body);background:var(--secondary-grouped-bg);border:1px solid var(--tint-ink);color:var(--tint-ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+#devToggle{font:600 13px var(--font-body);background:var(--secondary-grouped-bg);border:.5px solid var(--separator);border-radius:8px;padding:8px 14px;cursor:pointer;color:var(--secondary-label)}
+#devToggle.on{background:var(--tint);color:var(--on-tint)}
+.sec-prompt{font:600 11px var(--font-body);border:1px solid var(--tint-ink);background:var(--secondary-grouped-bg);color:var(--tint-ink);border-radius:8px;padding:3px 9px;margin-left:12px;cursor:pointer;vertical-align:middle}
+body.dev [data-insp]:hover{outline:2px dashed var(--orange);outline-offset:3px;cursor:pointer}
+.insp-sel{outline:2px solid var(--tint)!important;outline-offset:3px}
+#inspector{position:fixed;top:0;right:0;width:340px;height:100vh;background:var(--secondary-grouped-bg);border-left:.5px solid var(--separator);box-shadow:var(--elev-2);transform:translateX(100%);transition:transform .28s var(--ease);z-index:49;overflow:auto;padding:58px 20px 40px}
+body.inspecting #inspector{transform:translateX(0)} body.inspecting main{margin-right:340px}
+#inspector .iclose{position:absolute;top:16px;right:16px;border:none;background:none;font-size:18px;color:var(--secondary-label);cursor:pointer}
+#inspector .nm{font:700 20px var(--font-display)}
+#inspector .file{font:12px var(--font-mono);color:var(--secondary-label);margin-top:2px}
+#inspector .desc{font-size:13px;color:var(--secondary-label);line-height:1.6;margin-top:10px}
+#inspector h4{font-size:11px;color:var(--secondary-label);margin:20px 0 8px}
+.prop{padding:8px 0;border-bottom:.5px solid var(--separator)}.prop .pn{font:600 13px var(--font-mono)}.prop .pt{font:11px var(--font-mono);color:var(--tint-ink)}.prop .pdef{font:11px var(--font-mono);color:var(--secondary-label)}
+.tok{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;cursor:pointer}.tok:hover{background:var(--quaternary-fill)}
+.tok .tsw{width:22px;height:22px;border-radius:6px;border:.5px solid var(--separator);flex:0 0 22px}.tok .tn{font:600 12px var(--font-mono)}.tok .tr{font-size:11px;color:var(--secondary-label)}.tok .tv{margin-left:auto;font:11px var(--font-mono);color:var(--secondary-label)}
+.metric{display:flex;justify-content:space-between;font:12px var(--font-mono);padding:5px 0;border-bottom:.5px dashed var(--separator)}
+.copyprompt{width:100%;margin-top:16px;font:600 13px var(--font-body);background:var(--tint);color:var(--on-tint);border:none;border-radius:10px;padding:11px;cursor:pointer}
+.copied{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--label);color:var(--system-bg);font-size:12px;padding:8px 16px;border-radius:8px;opacity:0;transition:.2s;z-index:60;pointer-events:none}.copied.show{opacity:.95}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-armchair" viewBox="0 0 24 24"><path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3"/><path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M5 18v2M19 18v2"/></symbol>
+  <symbol id="i-smartphone" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M16 6l-4-4-4 4M12 2v13"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-more-h" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div id="topctl">
+  <button class="ds-btn" onclick="copyFullSystem()">⤓ Install design system</button>
+  <select id="themeSel" aria-label="Theme"><option value="">Light</option><option value="dark">Dark</option></select>
+  <select id="langSel" aria-label="Copy-as-prompt target"></select>
+  <button id="devToggle" onclick="toggleDev()">◧ Dev Mode</button>
+</div>
+<aside id="inspector"><button class="iclose" onclick="closeInspector()">✕</button><div id="inspectorBody"></div></aside>
+<div class="copied" id="copied">Copied</div>
+
+<nav class="side">
+  <div class="brand">TTS DS</div>
+  <a class="concept-link" href="concept.html">◳ &nbsp;Concept preview &nbsp;→</a>
+  <div class="grp">Foundations</div>
+  <a href="#colors">Color</a><a href="#type">Typography</a><a href="#materials">Materials</a><a href="#radius">Corner radius</a><a href="#spacing">Spacing &amp; layout</a><a href="#elevation">Elevation &amp; motion</a><a href="#icons">Iconography</a>
+  <div class="grp">Bars</div>
+  <a href="#navbar">Navigation bar</a><a href="#tabbar">Tab bar</a><a href="#toolbar">Toolbar</a><a href="#searchbar">Search bar</a>
+  <div class="grp">Content</div>
+  <a href="#list">Lists &amp; tables</a><a href="#sectionHeader">Section header/footer</a><a href="#card">Card</a><a href="#disclosure">Disclosure group</a>
+  <div class="grp">Controls</div>
+  <a href="#button">Buttons</a><a href="#menuButton">Pull-down / pop-up</a><a href="#segmented">Segmented control</a><a href="#slider">Slider</a><a href="#stepper">Stepper</a><a href="#toggle">Toggle</a><a href="#picker">Pickers</a><a href="#textfield">Text field</a><a href="#texteditor">Text editor</a><a href="#progress">Progress</a><a href="#pageControl">Page control</a>
+  <div class="grp">Modality</div>
+  <a href="#sheet">Sheet</a><a href="#actionSheet">Action sheet</a><a href="#alert">Alert</a><a href="#popover">Popover</a><a href="#contextMenu">Context menu</a><a href="#activityView">Activity view</a>
+  <div class="grp">Status</div>
+  <a href="#badge">Badge</a>
+</nav>
+
+<main>
+  <header style="margin-bottom:40px"><div class="t-largeTitle">TTS Design System</div>
+    <p class="sec-desc" style="margin-top:8px">Apple HIG의 토큰·컴포넌트 구분을 따르는 iOS 느낌 시스템. 원본은 <code>styles.css</code>. 하나의 강조색(파랑)만 조작을 이끌고, 초록·빨강·주황은 상태와 의미에만 씁니다. 그림자 없이 색과 헤어라인으로 면을 나눕니다.</p></header>
+
+  <section id="colors"><h2 class="sec">Color</h2><p class="sec-desc">시스템 색 + 의미 역할. 모든 채움은 짝이 되는 글자색과 함께 WCAG 대비를 계산해 정했습니다 (라이트 기준 값 표시, 다크는 테마 전환).</p><div class="colors" id="colorGrid"></div></section>
+  <section id="type"><h2 class="sec">Typography</h2><p class="sec-desc">HIG 텍스트 스타일 11단계 (Dynamic Type 기본 크기). 시스템 산세리프 하나로 위계를 만듭니다.</p><div id="typeList"></div></section>
+  <section id="materials"><h2 class="sec">Materials</h2><p class="sec-desc">무거운 그림자 대신 반투명 재질 + 블러. 바·메뉴·알림에 씁니다.</p>
+    <div class="matbg"><div class="matsw" style="background:var(--mat-ultrathin)">ultraThin</div><div class="matsw" style="background:var(--mat-thin)">thin</div><div class="matsw" style="background:var(--mat-regular)">regular</div><div class="matsw" style="background:var(--mat-thick)">thick</div><div class="matsw" style="background:var(--mat-chrome)">chrome</div></div></section>
+  <section id="radius"><h2 class="sec">Corner radius</h2><p class="sec-desc">연속 곡률 느낌의 작은 스케일. 카드·목록 그룹은 12.</p><div class="stage" id="radiusList"></div></section>
+  <section id="spacing"><h2 class="sec">Spacing &amp; layout</h2><p class="sec-desc">8pt 리듬. 관련 항목 8 &lt; 섹션 24 &lt; 큰 구획 32, 화면 여백 16, 최소 터치 44.</p><div id="spacingList"></div></section>
+  <section id="elevation"><h2 class="sec">Elevation &amp; motion</h2><p class="sec-desc">기본은 평면(elev-0). 떠 있는 레이어(알림·메뉴·시트)만 부드러운 깊이. 움직임은 250ms 기본, 토글은 약간 튕기는 spring.</p>
+    <div class="stage"><div class="cell"><div class="card" style="width:140px;height:70px;box-shadow:var(--elev-0)"></div><div class="spec">elev-0 · 카드/목록</div></div><div class="cell"><div class="card" style="width:140px;height:70px;box-shadow:var(--elev-1)"></div><div class="spec">elev-1 · 세그먼트 선택</div></div><div class="cell"><div class="card" style="width:140px;height:70px;box-shadow:var(--elev-2)"></div><div class="spec">elev-2 · 알림/메뉴/시트</div></div></div></section>
+  <section id="icons"><h2 class="sec">Iconography</h2><p class="sec-desc">SF 느낌(가는 1.6 선, 둥근 끝)의 오픈 세트(Lucide 계열) 기하. Apple SF Symbols는 쓰지 않고, 이모지도 쓰지 않습니다. <a href="icons.html" style="color:var(--link)">전체 보기</a></p><div class="iconGrid" id="iconGrid"></div></section>
+
+  <!-- ===================== BARS ===================== -->
+  <section id="navbar"><h2 class="sec">Navigation bar</h2><p class="sec-desc">standard (가운데 제목, 뒤로) · large title (홈 화면). 바는 chrome 재질.</p>
+    <div class="stage">
+      <div class="phone" data-insp="navbar"><div class="navbar"><div class="nb-btn"><svg class="ico"><use href="#i-chevron-left"/></svg>설정</div><div class="nb-title">목 각도</div><div class="nb-btn" style="visibility:hidden">설정</div></div></div>
+      <div class="phone" data-insp="navbar"><div class="navbar large"><div class="nb-row"><div class="nb-btn"><svg class="ico"><use href="#i-info"/></svg></div></div><div class="t-largeTitle">자세 관리</div></div></div>
+    </div></section>
+  <section id="tabbar"><h2 class="sec">Tab bar</h2><p class="sec-desc">선택 항목만 강조색. (현재 앱에서는 미사용 — 확장용)</p>
+    <div class="stage"><div class="phone" style="padding:0" data-insp="tabbar"><div class="tabbar"><div class="tb-item sel"><svg class="ico"><use href="#i-activity"/></svg>오늘</div><div class="tb-item"><svg class="ico"><use href="#i-calendar"/></svg>기록</div><div class="tb-item"><svg class="ico"><use href="#i-sliders"/></svg>설정</div></div></div></div></section>
+  <section id="toolbar"><h2 class="sec">Toolbar</h2><p class="sec-desc">화면 하단 보조 동작. (미사용 — 확장용)</p>
+    <div class="stage"><div class="phone" style="padding:0" data-insp="toolbar"><div class="toolbar"><div class="tl-btn"><svg class="ico"><use href="#i-share"/></svg></div><div class="tl-btn"><svg class="ico"><use href="#i-rotate"/></svg></div><div class="tl-btn"><svg class="ico"><use href="#i-trash"/></svg></div></div></div></div></section>
+  <section id="searchbar"><h2 class="sec">Search bar</h2><p class="sec-desc">채움 배경의 둥근 입력. (미사용 — 확장용)</p>
+    <div class="stage"><div class="phone" style="padding:12px 16px" data-insp="searchbar"><div class="searchbar"><svg class="ico ico--sm"><use href="#i-search"/></svg>기록 검색</div></div></div></section>
+
+  <!-- ===================== CONTENT ===================== -->
+  <section id="list"><h2 class="sec">Lists &amp; tables</h2><p class="sec-desc">plain · grouped · inset-grouped. 행: 앞 아이콘, 보조 텍스트, 값, 펼침 화살표, 스위치, 동작/파괴 행. 구분선은 텍스트 시작점에서 시작.</p>
+    <div class="stage">
+      <div class="phone" data-insp="list"><div class="section-header">inset-grouped</div><div class="list inset">
+        <div class="row has-icon"><div class="r-icon" style="background:var(--green-dot)"><svg class="ico ico--sm"><use href="#i-activity"/></svg></div><div class="r-main">백그라운드 측정</div><div class="toggle on"></div></div>
+        <div class="row has-icon tappable"><div class="r-icon" style="background:var(--tint)"><svg class="ico ico--sm"><use href="#i-smartphone"/></svg></div><div class="r-main">목 각도 디버그</div><svg class="ico ico--sm r-chev"><use href="#i-chevron-right"/></svg></div>
+        <div class="row"><div class="r-main">앉은 시간 부담<div class="r-sub">정지 중 · 18:42부터</div></div><div class="r-value t-num">12.4</div></div>
+        <div class="row tappable destructive">D 값 초기화</div></div></div>
+      <div class="phone" data-insp="list"><div class="section-header">grouped</div><div class="list grouped"><div class="row"><div class="r-main">마지막 계산</div><div class="r-value t-num">19:20:18</div></div><div class="row tappable action">로그 지우기</div></div>
+        <div class="section-header" style="margin-top:20px">plain</div><div class="list plain"><div class="row"><div class="r-main t-num">STILL ENTER · 18:59:33</div></div><div class="row"><div class="r-main t-num">WALKING ENTER · 18:41:02</div></div></div></div>
+    </div></section>
+  <section id="sectionHeader"><h2 class="sec">Section header/footer</h2><p class="sec-desc">헤더(13 footnote, secondaryLabel), prominent 헤더(title3), 푸터 설명.</p>
+    <div class="stage"><div class="phone" data-insp="sectionHeader"><div class="section-header">측정</div><div class="list inset"><div class="row"><div class="r-main">백그라운드 측정</div><div class="toggle"></div></div></div><div class="section-footer">앱을 닫아도 휴대폰이 목 기울기와 앉은 시간을 계속 잽니다.</div><div class="section-header prominent" style="margin-top:20px">오늘</div></div></div></section>
+  <section id="card"><h2 class="sec">Card</h2><p class="sec-desc">그룹 배경 위의 흰 컨테이너, 평면. 화면당 하나의 초점(진행 카드)에만 씁니다.</p>
+    <div class="stage"><div class="phone" style="padding:16px" data-insp="card"><div class="card"><div class="t-footnote">스트레칭 알림까지</div><div style="display:flex;align-items:baseline;gap:6px;margin:6px 0 10px"><span class="t-title1 t-num">14.9</span><span class="t-subheadline" style="color:var(--secondary-label)">/ 30</span></div><div class="progress thick"><i style="width:50%"></i></div><div class="t-footnote" style="margin-top:10px">목 2.5 · 앉은 시간 12.4</div></div></div></div></section>
+  <section id="disclosure"><h2 class="sec">Disclosure group</h2><p class="sec-desc">펼침/접힘. 화살표가 90° 회전.</p>
+    <div class="stage"><div class="phone" style="padding:0 16px" data-insp="disclosure"><div class="card disclosure open"><div class="dg-head"><span class="t-headline">계산 방식</span><svg class="ico ico--sm"><use href="#i-chevron-right"/></svg></div><div class="t-footnote" style="margin-top:8px">D = 목 부담 + 앉은 시간 부담. 30을 넘으면 알림이 옵니다.</div></div><div class="card disclosure" style="margin-top:10px"><div class="dg-head"><span class="t-headline">권한</span><svg class="ico ico--sm"><use href="#i-chevron-right"/></svg></div></div></div></div></section>
+
+  <!-- ===================== CONTROLS ===================== -->
+  <section id="button"><h2 class="sec">Buttons</h2><p class="sec-desc">plain · gray · tinted · bordered · bordered-prominent · filled, 역할 destructive, 상태 기본/눌림(60%)/비활성(35%).</p>
+    <div class="stage">
+      <div class="cell"><div class="btn btn-plain" data-insp="button">지우기</div><div class="spec">plain</div></div>
+      <div class="cell"><div class="btn btn-gray" data-insp="button">다시 측정</div><div class="spec">gray</div></div>
+      <div class="cell"><div class="btn btn-tinted" data-insp="button">보정 시작</div><div class="spec">tinted</div></div>
+      <div class="cell"><div class="btn btn-bordered" data-insp="button">기록</div><div class="spec">bordered</div></div>
+      <div class="cell"><div class="btn btn-bordered-prominent" data-insp="button">켜기</div><div class="spec">bordered-prominent</div></div>
+      <div class="cell"><div class="btn btn-filled" data-insp="button">측정 시작</div><div class="spec">filled</div></div>
+      <div class="cell"><div class="btn btn-plain destructive" data-insp="button">초기화</div><div class="spec">plain · destructive</div></div>
+      <div class="cell"><div class="btn btn-filled destructive" data-insp="button">초기화</div><div class="spec">filled · destructive</div></div>
+      <div class="cell"><div class="btn btn-filled" style="opacity:.6" data-insp="button">측정 시작</div><div class="spec">pressed</div></div>
+      <div class="cell"><div class="btn btn-filled disabled" data-insp="button">측정 시작</div><div class="spec">disabled</div></div>
+    </div></section>
+  <section id="menuButton"><h2 class="sec">Pull-down &amp; pop-up menu buttons</h2><p class="sec-desc">pull-down: 동작 목록. pop-up: 현재 선택값을 보여주는 선택.</p>
+    <div class="stage" style="align-items:flex-start">
+      <div class="cell" data-insp="menuButton"><div class="menu-btn"><svg class="ico"><use href="#i-more-h"/></svg></div><div class="menu"><div class="mi">로그 내보내기<svg class="ico ico--sm"><use href="#i-share"/></svg></div><div class="mi destructive">로그 지우기<svg class="ico ico--sm" style="color:var(--red)"><use href="#i-trash"/></svg></div></div><div class="spec">pull-down</div></div>
+      <div class="cell" data-insp="menuButton"><div class="menu-btn">30분<svg class="ico ico--sm"><use href="#i-chevron-down"/></svg></div><div class="menu"><div class="mi">15분</div><div class="mi">30분<svg class="ico ico--sm" style="color:var(--tint-ink)"><use href="#i-check"/></svg></div><div class="mi">1시간</div></div><div class="spec">pop-up</div></div>
+    </div></section>
+  <section id="segmented"><h2 class="sec">Segmented control</h2><p class="sec-desc">선택된 칸만 흰 면 + elev-1.</p>
+    <div class="stage"><div class="segmented" data-insp="segmented"><div class="seg sel">오늘</div><div class="seg">이번 주</div><div class="seg">전체</div></div></div></section>
+  <section id="slider"><h2 class="sec">Slider</h2><p class="sec-desc">채움 = 강조색, 흰 손잡이 28.</p>
+    <div class="stage"><div class="slider" data-insp="slider"><div class="sl-track"></div><div class="sl-fill" style="width:60%"></div><div class="sl-thumb" style="left:60%"></div></div></div></section>
+  <section id="stepper"><h2 class="sec">Stepper</h2><p class="sec-desc">−/+ 두 칸. 최소/최대에서 비활성.</p>
+    <div class="stage"><div class="cell"><div class="stepper" data-insp="stepper"><div class="st"><svg class="ico ico--sm"><use href="#i-minus"/></svg></div><div class="st"><svg class="ico ico--sm"><use href="#i-plus"/></svg></div></div><div class="spec">enabled</div></div><div class="cell"><div class="stepper" data-insp="stepper"><div class="st disabled"><svg class="ico ico--sm"><use href="#i-minus"/></svg></div><div class="st"><svg class="ico ico--sm"><use href="#i-plus"/></svg></div></div><div class="spec">at minimum</div></div></div></section>
+  <section id="toggle"><h2 class="sec">Toggle</h2><p class="sec-desc">51×31, 켜짐 = 초록(상태 의미), 꺼짐 = 회색. 상태는 손잡이 위치로도 구분됩니다.</p>
+    <div class="stage"><div class="cell"><div class="toggle on" data-insp="toggle"></div><div class="spec">on</div></div><div class="cell"><div class="toggle" data-insp="toggle"></div><div class="spec">off</div></div><div class="cell"><div class="toggle on disabled" data-insp="toggle"></div><div class="spec">disabled</div></div></div></section>
+  <section id="picker"><h2 class="sec">Pickers</h2><p class="sec-desc">wheel · date(compact) · time(compact).</p>
+    <div class="stage">
+      <div class="cell"><div class="picker-wheel" data-insp="picker"><div>15분</div><div class="pw-sel">30분</div><div>45분</div></div><div class="spec">wheel</div></div>
+      <div class="cell"><div class="picker-compact" data-insp="picker">2026. 11. 22.</div><div class="spec">date</div></div>
+      <div class="cell"><div class="picker-compact active" data-insp="picker">오후 7:20</div><div class="spec">time · editing</div></div>
+    </div></section>
+  <section id="textfield"><h2 class="sec">Text field</h2><p class="sec-desc">빈 값 · 포커스 · 입력됨 · 오류 · 비활성.</p>
+    <div class="stage col" style="max-width:420px">
+      <div class="textfield" data-insp="textfield"><span class="ph">메모 (선택)</span></div>
+      <div class="textfield focused" data-insp="textfield">점심 후 산책</div>
+      <div class="textfield" data-insp="textfield">점심 후 산책</div>
+      <div><div class="textfield error" data-insp="textfield">0</div><div class="t-footnote" style="color:var(--red);margin:6px 16px 0">1 이상이어야 합니다</div></div>
+      <div class="textfield disabled" data-insp="textfield"><span class="ph">비활성</span></div>
+    </div></section>
+  <section id="texteditor"><h2 class="sec">Text editor</h2><p class="sec-desc">여러 줄 입력.</p>
+    <div class="stage col" style="max-width:420px"><div class="texteditor" data-insp="texteditor">오늘은 오후에 목이 뻐근했다. 30분마다 일어나 보기.</div></div></section>
+  <section id="progress"><h2 class="sec">Progress</h2><p class="sec-desc">bar(기본 4 / 강조 8, 기준 80% 이상이면 주황) · activity spinner.</p>
+    <div class="stage col" style="max-width:420px" data-insp="progress">
+      <div class="progress"><i style="width:35%"></i></div>
+      <div class="progress thick"><i style="width:50%"></i></div>
+      <div class="progress thick warn"><i style="width:88%"></i></div>
+      <div style="display:flex;gap:10px;align-items:center"><div class="spinner"></div><span class="t-footnote">측정 시작 중…</span></div>
+    </div></section>
+  <section id="pageControl"><h2 class="sec">Page control</h2><p class="sec-desc">온보딩 단계 표시. (확장용)</p>
+    <div class="stage"><div class="page-control" data-insp="pageControl"><i class="sel"></i><i></i><i></i></div></div></section>
+
+  <!-- ===================== MODALITY ===================== -->
+  <section id="sheet"><h2 class="sec">Sheet</h2><p class="sec-desc">grabber + 제목 바, 그룹 배경. page/form 공통.</p>
+    <div class="stage"><div class="phone" style="padding:0" data-insp="sheet"><div class="sheet"><div class="grabber"></div><div class="sh-bar"><div class="btn btn-plain">취소</div><div class="t-headline">권한</div><div class="btn btn-plain" style="font-weight:600">완료</div></div><div class="list inset" style="margin-bottom:16px"><div class="row"><div class="r-main">신체 활동</div><div class="r-value">허용됨</div></div><div class="row"><div class="r-main">알림</div><div class="r-value">허용됨</div></div></div></div></div></div></section>
+  <section id="actionSheet"><h2 class="sec">Action sheet</h2><p class="sec-desc">설명 + 동작 + 분리된 취소. 파괴 동작은 빨강.</p>
+    <div class="stage"><div class="phone" style="padding:12px" data-insp="actionSheet"><div class="action-sheet"><div class="as-group"><div class="as-title">D_n, D_s, D를 0으로 되돌립니다. 보정 데이터는 그대로 둡니다.</div><div class="as-btn destructive">D 값 초기화</div></div><div class="as-group"><div class="as-btn cancel">취소</div></div></div></div></div></section>
+  <section id="alert"><h2 class="sec">Alert</h2><p class="sec-desc">270 폭, 두 버튼 가로 배치, 선호 동작은 굵게.</p>
+    <div class="stage"><div class="alert" data-insp="alert"><div class="al-body"><div class="al-title">신체 활동 권한 필요</div><div class="al-msg">앉은 시간을 재려면 권한이 있어야 합니다.</div></div><div class="al-actions"><div>취소</div><div class="pref">설정 열기</div></div></div></div></section>
+  <section id="popover"><h2 class="sec">Popover</h2><p class="sec-desc">짧은 설명 풍선. (확장용)</p>
+    <div class="stage"><div class="popover" data-insp="popover"><div class="t-headline">D_s란?</div><div class="t-footnote" style="margin-top:4px">가만히 있으면 분당 1씩 늘고, 걸으면 분당 2씩 줄어드는 앉은 시간 부담입니다.</div></div></div></section>
+  <section id="contextMenu"><h2 class="sec">Context menu</h2><p class="sec-desc">길게 누른 항목 미리보기 + 메뉴.</p>
+    <div class="stage" style="align-items:flex-start"><div class="cell" data-insp="contextMenu" style="align-items:flex-start;gap:10px"><div class="context-preview t-num">STILL ENTER · 18:59:33</div><div class="menu"><div class="mi">복사<svg class="ico ico--sm"><use href="#i-list"/></svg></div><div class="mi destructive">이 기록 삭제<svg class="ico ico--sm" style="color:var(--red)"><use href="#i-trash"/></svg></div></div></div></div></section>
+  <section id="activityView"><h2 class="sec">Activity view (share sheet)</h2><p class="sec-desc">로그 공유용. (확장용, 앱 아이콘은 자리표시)</p>
+    <div class="stage"><div class="phone" style="padding:0" data-insp="activityView"><div class="activity-view"><div class="t-headline">cycles_2026-11-22.csv</div><div class="t-footnote">CSV · 12KB</div><div class="av-apps"><div class="av-app"><div class="av-icon"><svg class="ico"><use href="#i-share"/></svg></div>앱 자리표시</div><div class="av-app"><div class="av-icon"><svg class="ico"><use href="#i-share"/></svg></div>앱 자리표시</div></div><div class="list inset" style="margin:0"><div class="row">복사</div><div class="row">파일에 저장</div></div></div></div></div></section>
+
+  <!-- ===================== STATUS ===================== -->
+  <section id="badge"><h2 class="sec">Badge</h2><p class="sec-desc">숫자 배지 · 점 배지 · 상태 점(측정 켜짐/꺼짐).</p>
+    <div class="stage"><div class="cell"><span class="badge" data-insp="badge">3</span><div class="spec">count</div></div><div class="cell"><span class="badge dot" data-insp="badge"></span><div class="spec">dot</div></div><div class="cell"><span data-insp="badge"><span class="status-dot on"></span> <span class="t-footnote">측정 중</span></span><div class="spec">status on</div></div><div class="cell"><span data-insp="badge"><span class="status-dot"></span> <span class="t-footnote">꺼짐</span></span><div class="spec">status off</div></div></div></section>
+</main>
+
+<script>
+const COLORS=[['tint','#0066D6'],['on-tint','#FFFFFF'],['red (destructive)','#D70015'],['green (status text)','#1F7A35'],['green-dot (status/toggle)','#28A745'],['orange (near threshold)','#C93400'],['gray (toggle off)','#8E8E93'],['label','#000000'],['secondary-label','#6C6C70'],['tertiary-label','#8E8E93'],['quaternary-label','#C7C7CC'],['grouped-bg','#F2F2F7'],['secondary-grouped-bg','#FFFFFF'],['separator','#C6C6C8'],['track','#E5E5EA'],['fill','rgba(120,120,128,.20)']];
+const TYPE=[['t-largeTitle','700 / 34·41','자세 관리'],['t-title1','700 / 28·34','14.9'],['t-title2','700 / 22·28','오늘'],['t-title3','600 / 20·25','측정'],['t-headline','600 / 17·22','백그라운드 측정'],['t-body','400 / 17·22','앱을 닫아도 계속 잽니다'],['t-callout','400 / 16·21','목 각도 디버그'],['t-subheadline','400 / 15·20','정지 중 · 18:42부터'],['t-footnote','400 / 13·18','앱을 닫아도 휴대폰이 계속 잽니다.'],['t-caption1','400 / 12·16','19:20:18 계산'],['t-caption2','400 / 11·13','v1.0']];
+const SPACING=[['sp-4',4],['sp-8 · gap-related',8],['sp-12',12],['sp-16 · layout-gutter',16],['sp-24 · gap-section',24],['sp-32 · gap-major',32],['row-min / target-min',44],['sp-48',48]];
+const RADII=[['r-xs',6],['r-sm',8],['r-md',10],['r-lg',12],['r-xl',16],['r-sheet',20],['r-full',999]];
+colorGrid.innerHTML=COLORS.map(([n,h])=>`<div class="sw"><div class="c" style="background:${h}"></div><div class="m"><div class="n">${n}</div><div class="v">${h}</div></div></div>`).join('');
+typeList.innerHTML=TYPE.map(([n,m,s])=>`<div class="typerow"><div class="tk">${n}<br>${m}</div><div class="${n}">${s}</div></div>`).join('');
+spacingList.innerHTML=SPACING.map(([n,v])=>`<div class="sprow"><div class="lbl">${n} · ${v}</div><div class="bar" style="width:${v*4}px"></div></div>`).join('');
+radiusList.innerHTML=RADII.map(([n,v])=>`<div class="cell"><div style="width:72px;height:72px;background:var(--secondary-grouped-bg);border:1px solid var(--separator);border-radius:${Math.min(v,36)}px"></div><div class="spec">${n} · ${v}</div></div>`).join('');
+iconGrid.innerHTML=[...document.querySelectorAll('symbol')].map(s=>`<div class="it"><svg class="ico ico--lg"><use href="#${s.id}"/></svg><div class="nm">${s.id}</div></div>`).join('');
+
+const T=(r,n,v,c)=>({r,n,v,c});
+const tint=T('fill / text','tint','#0066D6','#0066D6'), onTint=T('label on fill','on-tint','#FFFFFF','#FFFFFF'), card=T('container','secondary-grouped-bg','#FFFFFF','#FFFFFF'), sep=T('hairline','separator','#C6C6C8','#C6C6C8'), lab=T('text','label','#000000','#000000'), sec=T('secondary text','secondary-label','#6C6C70','#6C6C70'), chrome=T('bar material','mat-chrome','rgba(249,249,249,.94) + blur 20',null), red=T('destructive','red','#D70015','#D70015');
+const SPECS={
+  navbar:{name:'Navigation bar',file:'ui/NavigationBar',desc:'Standard (centered title, back button) or large title (home). Chrome material with hairline bottom; large title variant is transparent on grouped bg.',props:[{n:'title',t:'String'},{n:'style',t:'standard|large',def:'standard'},{n:'leading',t:'BarButton?'},{n:'trailing',t:'BarButton?'}],tokens:[chrome,sep,tint,T('title','t-headline / t-largeTitle','600 17 / 700 34')],metrics:[['height','44 (+52 large)'],['button target','44×44']]},
+  tabbar:{name:'Tab bar',file:'ui/TabBar',desc:'Bottom tabs; selected item uses tint, others gray. Not used yet.',props:[{n:'items',t:'List<Tab>'},{n:'selected',t:'Int',def:'0'}],tokens:[chrome,tint,T('unselected','gray','#8E8E93','#8E8E93')],metrics:[['height','50'],['label','500 10']]},
+  toolbar:{name:'Toolbar',file:'ui/Toolbar',desc:'Bottom row of secondary actions in tint. Not used yet.',props:[{n:'items',t:'List<BarButton>'}],tokens:[chrome,tint,sep],metrics:[['height','44'],['padding','h 16']]},
+  searchbar:{name:'Search bar',file:'ui/SearchBar',desc:'Filled rounded field with leading magnifier. Not used yet.',props:[{n:'query',t:'String'},{n:'placeholder',t:'String'}],tokens:[T('fill','tertiary-fill','rgba(118,118,128,.12)',null),sec],metrics:[['height','36'],['radius','r-md 10']]},
+  list:{name:'List / table',file:'ui/ListRow + ListSection',desc:'plain / grouped / inset-grouped. Rows: leading icon tile, title+subtitle, trailing value, chevron, toggle, action (tint) or destructive (red) row. Separators inset to text start.',props:[{n:'style',t:'plain|grouped|insetGrouped',def:'insetGrouped'},{n:'title',t:'String'},{n:'subtitle',t:'String?'},{n:'value',t:'String?'},{n:'accessory',t:'none|chevron|toggle',def:'none'},{n:'role',t:'normal|action|destructive',def:'normal'}],tokens:[card,sep,lab,sec,T('chevron','tertiary-label','#8E8E93','#8E8E93'),red],metrics:[['min height','44'],['padding','v 11 · h 16'],['inset radius','r-lg 12'],['inset margin','16'],['icon tile','29 · r 7']]},
+  sectionHeader:{name:'Section header / footer',file:'ui/SectionHeader',desc:'Footnote header above a group, prominent (title3) variant, footnote footer for explanation.',props:[{n:'text',t:'String'},{n:'prominent',t:'bool',def:'false'}],tokens:[sec,T('type','t-footnote','400 13/18')],metrics:[['inset','gutter + 16'],['gap to group','7']]},
+  card:{name:'Card',file:'ui/Card',desc:'Flat white container on grouped bg. Reserved for the one focal element per screen.',props:[{n:'content',t:'View'}],tokens:[card,T('elevation','elev-0','none')],metrics:[['radius','r-lg 12'],['padding','16']]},
+  disclosure:{name:'Disclosure group',file:'ui/DisclosureGroup',desc:'Expandable section; chevron rotates 90° on open (250ms).',props:[{n:'title',t:'String'},{n:'expanded',t:'bool',def:'false'}],tokens:[tint,lab,T('motion','dur-base','250ms')],metrics:[['row','44']]},
+  button:{name:'Button',file:'ui/Button',desc:'plain / gray / tinted / bordered / bordered-prominent / filled; role destructive; pressed 60% opacity, disabled 35%. One filled button per screen.',props:[{n:'label',t:'String'},{n:'style',t:'plain|gray|tinted|bordered|borderedProminent|filled',def:'filled'},{n:'role',t:'normal|destructive',def:'normal'},{n:'enabled',t:'bool',def:'true'}],tokens:[tint,onTint,T('tinted bg','tint 12%','color-mix',null),red,T('label','t-headline','600 17')],metrics:[['radius','r-lg 12 (bordered: full)'],['height','50 filled · 44 · 34 bordered'],['padding','h 16']]},
+  menuButton:{name:'Pull-down / pop-up menu',file:'ui/MenuButton',desc:'Pull-down: list of actions from a button. Pop-up: shows current choice with check.',props:[{n:'items',t:'List<MenuItem>'},{n:'mode',t:'pullDown|popUp',def:'pullDown'}],tokens:[T('menu','mat-thick','rgba(249,249,249,.92)',null),T('shadow','elev-2','0 8 30 /.16'),sep,red,tint],metrics:[['min width','220'],['radius','r-lg 12'],['item','v 11 · h 16']]},
+  segmented:{name:'Segmented control',file:'ui/SegmentedControl',desc:'Selected segment gets a white surface and elev-1.',props:[{n:'segments',t:'List<String>'},{n:'selected',t:'Int',def:'0'}],tokens:[T('track','tertiary-fill','rgba(118,118,128,.12)',null),card,T('shadow','elev-1','0 1 3 /.10')],metrics:[['height','32'],['radius','9 / 7']]},
+  slider:{name:'Slider',file:'ui/Slider',desc:'Tint fill, white 28 thumb.',props:[{n:'value',t:'Float'},{n:'range',t:'ClosedRange'}],tokens:[tint,T('track','track','#E5E5EA','#E5E5EA')],metrics:[['track','4'],['thumb','28']]},
+  stepper:{name:'Stepper',file:'ui/Stepper',desc:'− / + pair; disabled at bounds.',props:[{n:'value',t:'Int'},{n:'range',t:'IntRange'}],tokens:[T('bg','tertiary-fill','rgba(118,118,128,.12)',null),lab,T('disabled','quaternary-label','#C7C7CC','#C7C7CC')],metrics:[['size','94×32'],['radius','r-sm 8']]},
+  toggle:{name:'Toggle',file:'ui/Toggle',desc:'51×31 switch; on = green-dot (status meaning), off = gray; spring thumb.',props:[{n:'isOn',t:'bool',def:'false'},{n:'enabled',t:'bool',def:'true'}],tokens:[T('on track','green-dot','#28A745','#28A745'),T('off track','gray','#8E8E93','#8E8E93'),T('thumb','white','#FFFFFF','#FFFFFF')],metrics:[['size','51×31'],['thumb','27'],['contrast','on 3.13 · off 3.26 vs card']]},
+  picker:{name:'Pickers',file:'ui/Picker',desc:'wheel / date (compact) / time (compact); editing value turns tint.',props:[{n:'mode',t:'wheel|date|time',def:'wheel'},{n:'value',t:'Any'}],tokens:[lab,T('fill','tertiary-fill','rgba(118,118,128,.12)',null),tint],metrics:[['compact height','34'],['wheel row','34']]},
+  textfield:{name:'Text field',file:'ui/TextField',desc:'States empty / focused (tint ring) / filled / error (red ring + footnote) / disabled.',props:[{n:'text',t:'String'},{n:'placeholder',t:'String'},{n:'error',t:'String?'},{n:'enabled',t:'bool',def:'true'}],tokens:[card,lab,T('placeholder','tertiary-label','#8E8E93','#8E8E93'),T('focus','focus-ring','tint 45% · 3'),red],metrics:[['height','44'],['radius','r-md 10']]},
+  texteditor:{name:'Text editor',file:'ui/TextEditor',desc:'Multiline input on a card.',props:[{n:'text',t:'String'}],tokens:[card,lab],metrics:[['min height','110'],['padding','12 · 16']]},
+  progress:{name:'Progress',file:'ui/ProgressBar + ActivityIndicator',desc:'Bar 4 (default) / 8 (focal); turns orange at ≥80% of threshold. Spinner for loading.',props:[{n:'value',t:'Float 0..1'},{n:'thickness',t:'4|8',def:'4'},{n:'warnAt',t:'Float',def:'0.8'}],tokens:[tint,T('warn','orange','#C93400','#C93400'),T('track','track','#E5E5EA','#E5E5EA')],metrics:[['radius','half height'],['contrast','tint 4.62 · orange 4.21 vs track']]},
+  pageControl:{name:'Page control',file:'ui/PageControl',desc:'Dots for onboarding steps. Not used yet.',props:[{n:'count',t:'Int'},{n:'current',t:'Int'}],tokens:[lab,T('inactive','quaternary-label','#C7C7CC','#C7C7CC')],metrics:[['dot','8'],['gap','8']]},
+  sheet:{name:'Sheet',file:'ui/Sheet',desc:'Grabber + title bar with cancel/done on grouped bg.',props:[{n:'title',t:'String'},{n:'detents',t:'medium|large',def:'large'}],tokens:[T('bg','grouped-bg','#F2F2F7','#F2F2F7'),T('shadow','elev-2','0 8 30 /.16')],metrics:[['radius','r-sheet 20'],['grabber','36×5']]},
+  actionSheet:{name:'Action sheet',file:'ui/ActionSheet',desc:'Message + actions group, separate bold cancel. Destructive in red. Used to confirm D reset.',props:[{n:'message',t:'String?'},{n:'actions',t:'List<Action>'}],tokens:[T('group','mat-thick','rgba(249,249,249,.92)',null),tint,red],metrics:[['radius','14'],['button','57'],['gap','8']]},
+  alert:{name:'Alert',file:'ui/Alert',desc:'270 wide; two actions side by side; preferred action bold.',props:[{n:'title',t:'String'},{n:'message',t:'String?'},{n:'actions',t:'List<Action>'}],tokens:[T('bg','mat-thick','rgba(249,249,249,.92)',null),tint,red,sep],metrics:[['width','270'],['radius','14'],['button','44']]},
+  popover:{name:'Popover',file:'ui/Popover',desc:'Short explanation bubble with arrow. Not used yet.',props:[{n:'content',t:'View'}],tokens:[card,T('shadow','elev-2','0 8 30 /.16')],metrics:[['max width','260'],['radius','r-lg 12']]},
+  contextMenu:{name:'Context menu',file:'ui/ContextMenu',desc:'Long-press: lifted preview + menu.',props:[{n:'preview',t:'View'},{n:'items',t:'List<MenuItem>'}],tokens:[card,T('shadow','elev-2','0 8 30 /.16'),red],metrics:[['preview scale','1.03']]},
+  activityView:{name:'Activity view',file:'ui/ShareSheet',desc:'Share sheet for exporting logs (system-provided on device). App icons are placeholders.',props:[{n:'items',t:'List<Uri>'}],tokens:[T('bg','grouped-bg','#F2F2F7','#F2F2F7'),card],metrics:[['app tile','60 · r 14']]},
+  badge:{name:'Badge / status dot',file:'ui/Badge',desc:'Count badge, dot badge, and the status dot (green when monitoring).',props:[{n:'count',t:'Int?'},{n:'kind',t:'count|dot|status',def:'count'},{n:'on',t:'bool',def:'false'}],tokens:[red,T('on','green-dot','#28A745','#28A745'),T('off','gray','#8E8E93','#8E8E93')],metrics:[['height','18'],['dot','10 / 8']]},
+};
+
+const LANGS=['Android Views (Kotlin + XML)','Jetpack Compose (Kotlin)','SwiftUI','React (TypeScript + CSS)','Flutter (Dart)','React Native','HTML + CSS'];
+let promptLang=LANGS[0];
+langSel.innerHTML=LANGS.map(l=>`<option${l===promptLang?' selected':''}>${l}</option>`).join('');
+langSel.onchange=()=>promptLang=langSel.value;
+const varGroups={
+ 'Color roles':['--tint','--on-tint','--tint-ink','--red','--on-red','--green','--green-dot','--orange','--gray','--label','--secondary-label','--tertiary-label','--quaternary-label','--system-bg','--secondary-system-bg','--grouped-bg','--secondary-grouped-bg','--tertiary-grouped-bg','--separator','--fill','--secondary-fill','--tertiary-fill','--quaternary-fill','--track','--link'],
+ 'Materials':['--mat-ultrathin','--mat-thin','--mat-regular','--mat-thick','--mat-chrome','--mat-blur'],
+ 'Spacing':['--gap-related','--gap-section','--gap-major','--layout-gutter','--row-min','--target-min','--sp-4','--sp-8','--sp-12','--sp-16','--sp-24','--sp-32','--sp-48'],
+ 'Radius':['--r-xs','--r-sm','--r-md','--r-lg','--r-xl','--r-sheet','--r-full'],
+ 'Elevation':['--elev-0','--elev-1','--elev-2'],
+ 'Type families':['--font-display','--font-body','--font-mono'],
+ 'Motion':['--dur-fast','--dur-base','--ease','--ease-spring'],
+ 'Icons':['--icon-size','--icon-inline','--icon-large','--icon-stroke','--icon-cap','--icon-join']};
+function tokenLines(){const cs=getComputedStyle(document.documentElement);const out=[];for(const[g,ns]of Object.entries(varGroups)){const rows=ns.map(n=>{const v=cs.getPropertyValue(n).trim();return v?`- ${n} = ${v}`:null;}).filter(Boolean);if(rows.length)out.push(`### ${g}`,...rows,'');}return out;}
+function foundationsBody(){const L=[`## Foundations — design tokens (single source of truth)`,`Define every token as a named constant in ONE theme/config layer idiomatic to ${promptLang} (Android: res/values/colors.xml + values-night/colors.xml, dimens, themes.xml styles). Components reference tokens by name — never inline raw values. Dark values come from the :root[data-theme="dark"] block in styles.css.`,'',...tokenLines(),`### Text styles`];TYPE.forEach(([n,m])=>L.push(`- ${n}: ${m}`));L.push('',`### Rules`,`- Tint is the only interaction color; green/red/orange carry status meaning only.`,`- Every fill keeps its paired foreground (WCAG ≥ 4.5:1 text, ≥ 3:1 UI). Don't break a pair.`,`- Flat surfaces separated by color + hairline; only overlays (alert, menu, sheet) get elev-2.`,`- Inset-grouped lists with 16 margins; related 8 < section 24 < major 32.`);return L.join('\n');}
+function buildPrompt(key){const s=SPECS[key];const L=[`# Add or update the \`${s.name}\` component — ${promptLang}`,'',`If a component with this role ALREADY EXISTS, modify it IN PLACE to match this spec (source of truth) — don't duplicate; note breaking changes. Otherwise create it, reusing existing tokens and the project's layout.`,'',`## What it is`,s.desc,'',`## Props`];s.props.forEach(p=>L.push(`- \`${p.n}\`: ${p.t}${p.def?` (default ${p.def})`:''}`));L.push('',`## Design tokens`);s.tokens.forEach(t=>L.push(`- ${t.n} = ${t.v}   // ${t.r}`));L.push('',`## Metrics`);s.metrics.forEach(([k,v])=>L.push(`- ${k}: ${v}`));L.push('',`## Requirements`,`- Implement every variant/state listed; touch targets ≥ 44pt / 48dp.`,`- Reference tokens by name; support light + dark.`,`- Output complete, compilable ${promptLang} code + a short usage example.`);return L.join('\n');}
+function copyPrompt(key){copyText(buildPrompt(key));toast(`Copied: ${SPECS[key].name} → ${promptLang}`);}
+function fullSystemPrompt(){const keys=Object.keys(SPECS);const L=[`# Install or update the ENTIRE design system — ${promptLang}`,'',`Scaffold from scratch, or update existing parts IN PLACE to match this spec.`,'',`## Build order`,`1. Foundation token layer (light + dark).`,`2. Components — may be split across parallel workers, but every one imports the shared token layer; never redefine values locally.`,`3. Reconcile: confirm every component references only named tokens.`,'','---','',foundationsBody(),'','---','',`## Components (${keys.length})`];keys.forEach(k=>{const s=SPECS[k];L.push('',`### ${s.name} — \`${s.file}\``,s.desc,`- props: ${s.props.map(p=>p.n+':'+p.t).join(', ')}`,`- tokens: ${s.tokens.map(t=>t.n).join(', ')}`,`- metrics: ${s.metrics.map(m=>m[0]+' '+m[1]).join(', ')}`);});return L.join('\n');}
+function copyFullSystem(){copyText(fullSystemPrompt());toast(`Copied: Install design system (${Object.keys(SPECS).length} components) → ${promptLang}`);}
+function copyText(t){navigator.clipboard&&navigator.clipboard.writeText(t);}
+document.querySelectorAll('main section[id]').forEach(sec=>{const key=sec.id;if(!SPECS[key])return;const h=sec.querySelector('h2.sec');if(!h||h.querySelector('.sec-prompt'))return;const b=document.createElement('button');b.className='sec-prompt';b.type='button';b.textContent='Copy as prompt';b.addEventListener('click',()=>copyPrompt(key));h.appendChild(b);});
+function toggleDev(){const on=document.body.classList.toggle('dev');devToggle.classList.toggle('on',on);devToggle.textContent=on?'◧ Dev Mode · ON':'◧ Dev Mode';if(!on)closeInspector();}
+function closeInspector(){document.body.classList.remove('inspecting');document.querySelectorAll('.insp-sel').forEach(e=>e.classList.remove('insp-sel'));}
+document.addEventListener('click',e=>{if(e.target.closest('#inspector')||e.target.closest('#topctl'))return;if(!document.body.classList.contains('dev'))return;const el=e.target.closest('[data-insp]');if(el&&SPECS[el.dataset.insp])selectComp(el,el.dataset.insp);});
+function selectComp(el,key){document.querySelectorAll('.insp-sel').forEach(x=>x.classList.remove('insp-sel'));el.classList.add('insp-sel');document.body.classList.add('inspecting');const s=SPECS[key];
+  const props=s.props.map(p=>`<div class="prop"><span class="pn">${p.n}</span> <span class="pt">${p.t}</span>${p.def?` <span class="pdef">= ${p.def}</span>`:''}</div>`).join('');
+  const toks=s.tokens.map(t=>`<div class="tok" onclick="copyVal('${t.v}')"><div class="tsw" style="background:${t.c||'var(--quaternary-fill)'}"></div><div><div class="tn">${t.n}</div><div class="tr">${t.r}</div></div><div class="tv">${t.v}</div></div>`).join('');
+  const mets=s.metrics.map(([k,v])=>`<div class="metric"><span>${k}</span><span>${v}</span></div>`).join('');
+  inspectorBody.innerHTML=`<div class="nm">${s.name}</div><div class="file">${s.file}</div><div class="desc">${s.desc}</div><h4>Properties</h4>${props}<h4>Design tokens · click to copy</h4>${toks}<h4>Metrics</h4>${mets}<button class="copyprompt" onclick="copyPrompt('${key}')">Copy as prompt</button>`;}
+function copyVal(v){navigator.clipboard&&navigator.clipboard.writeText(v);toast('Copied '+v);}
+function toast(m){copied.textContent=m;copied.classList.add('show');setTimeout(()=>copied.classList.remove('show'),1300);}
+</script>
+</body>
+</html>

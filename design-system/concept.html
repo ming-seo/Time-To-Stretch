@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTS · Concept</title>
+<link rel="stylesheet" href="styles.css">
+<script src="theme.js"></script>
+<style>
+/* layout glue only — tokens + DS classes do the rest */
+body{background:var(--secondary-system-bg);padding:28px 24px 60px}
+.top{display:flex;gap:12px;align-items:center;margin-bottom:24px}
+.top a{color:var(--link);font:400 15px var(--font-body);text-decoration:none}
+#themeSel{margin-left:auto;font:600 12px var(--font-body);border:.5px solid var(--separator);border-radius:8px;padding:8px 10px;background:var(--secondary-grouped-bg);color:var(--secondary-label)}
+.frames{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.frame-wrap{display:flex;flex-direction:column;gap:10px}
+.frame-label{font:600 13px var(--font-body);color:var(--secondary-label)}
+.frame{width:390px;height:844px;background:var(--grouped-bg);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.statusbar{height:47px;flex:0 0 47px}
+.scroll{flex:1;overflow:hidden;padding-bottom:var(--gap-major)}
+.group{margin-top:var(--gap-section)}
+.hero{display:flex;align-items:baseline;gap:6px;margin:var(--sp-8) 0 var(--sp-12)}
+.status{display:flex;align-items:center;gap:6px;padding:0 var(--layout-gutter);margin-top:-2px}
+.big{padding:var(--sp-8) var(--layout-gutter) 0}
+.big .num{font:700 64px/1 var(--font-display);letter-spacing:-.02em}
+.center{display:flex;justify-content:center;margin:var(--gap-section) 0 0}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-armchair" viewBox="0 0 24 24"><path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3"/><path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M5 18v2M19 18v2"/></symbol>
+  <symbol id="i-smartphone" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+</svg>
+
+<div class="top"><a href="index.html">← Back to style guide</a><select id="themeSel" aria-label="Theme"><option value="">Light</option><option value="dark">Dark</option></select></div>
+
+<div class="frames">
+  <!-- FIRST VIEW: home / status — large title, one focal card, inset-grouped settings -->
+  <div class="frame-wrap"><div class="frame-label">First view · 홈 (상태 + 설정)</div>
+  <div class="frame"><div class="statusbar"></div><div class="scroll">
+    <div class="navbar large"><div class="t-largeTitle">자세 관리</div></div>
+    <div class="status"><span class="status-dot on"></span><span class="t-subheadline" style="color:var(--green)">측정 중</span><span class="t-subheadline" style="color:var(--secondary-label)">· 앱을 닫아도 계속 잽니다</span></div>
+
+    <div class="group" style="padding:0 var(--layout-gutter)"><div class="card">
+      <div class="t-footnote">스트레칭 알림까지</div>
+      <div class="hero"><span class="t-title1 t-num">14.9</span><span class="t-subheadline" style="color:var(--secondary-label)">/ 30</span></div>
+      <div class="progress thick"><i style="width:50%"></i></div>
+      <div class="t-footnote" style="margin-top:var(--sp-12)">마지막 계산 19:20:18</div>
+    </div></div>
+
+    <div class="group"><div class="section-header">측정</div><div class="list inset">
+      <div class="row has-icon"><div class="r-icon" style="background:var(--green-dot)"><svg class="ico ico--sm"><use href="#i-activity"/></svg></div><div class="r-main">백그라운드 측정</div><div class="toggle on"></div></div>
+    </div><div class="section-footer">휴대폰이 목 기울기와 앉아 있는 시간을 계속 잽니다. 합계가 30을 넘으면 알림이 옵니다.</div></div>
+
+    <div class="group"><div class="section-header">현재 부담</div><div class="list inset">
+      <div class="row has-icon"><div class="r-icon" style="background:var(--tint)"><svg class="ico ico--sm"><use href="#i-smartphone"/></svg></div><div class="r-main">목 기울기</div><div class="r-value t-num">2.5</div></div>
+      <div class="row has-icon tappable"><div class="r-icon" style="background:var(--orange)"><svg class="ico ico--sm"><use href="#i-armchair"/></svg></div><div class="r-main">앉은 시간<div class="r-sub">정지 중</div></div><div class="r-value t-num">12.4</div><svg class="ico ico--sm r-chev"><use href="#i-chevron-right"/></svg></div>
+    </div></div>
+
+    <div class="group"><div class="list inset">
+      <div class="row tappable"><div class="r-main">목 각도 디버그</div><svg class="ico ico--sm r-chev"><use href="#i-chevron-right"/></svg></div>
+      <div class="row tappable destructive">D 값 초기화</div>
+    </div></div>
+  </div></div></div>
+
+  <!-- DETAIL: sitting load — big-type number, segmented, plain timeline, explanatory popover -->
+  <div class="frame-wrap"><div class="frame-label">Detail · 앉은 시간 부담</div>
+  <div class="frame"><div class="statusbar"></div>
+    <div class="navbar"><div class="nb-btn"><svg class="ico"><use href="#i-chevron-left"/></svg>자세 관리</div><div class="nb-title">앉은 시간</div><div class="nb-btn"><svg class="ico"><use href="#i-info"/></svg></div></div>
+    <div class="scroll">
+      <div class="big"><div class="t-footnote">지금 부담</div><div class="num t-num">12.4</div>
+        <div class="t-subheadline" style="color:var(--secondary-label);margin-top:var(--sp-8)">18:42부터 가만히 있어요. 걸으면 분당 2씩 줄어듭니다.</div></div>
+      <div class="center"><div class="segmented"><div class="seg sel">오늘</div><div class="seg">최근 7일</div></div></div>
+
+      <div class="group"><div class="section-header">활동 전환</div><div class="list grouped">
+        <div class="row"><svg class="ico ico--sm" style="color:var(--secondary-label)"><use href="#i-clock"/></svg><div class="r-main">정지 시작</div><div class="r-value t-num">18:42:10</div></div>
+        <div class="row"><svg class="ico ico--sm" style="color:var(--secondary-label)"><use href="#i-clock"/></svg><div class="r-main">걷기 시작</div><div class="r-value t-num">18:31:55</div></div>
+        <div class="row"><svg class="ico ico--sm" style="color:var(--secondary-label)"><use href="#i-clock"/></svg><div class="r-main">정지 끝</div><div class="r-value t-num">18:31:40</div></div>
+      </div><div class="section-footer">전환은 휴대폰이 알려줄 때만 기록돼서 수십 초 늦을 수 있어요.</div></div>
+
+      <div class="group" style="padding:0 var(--layout-gutter)"><div class="popover" style="max-width:none"><div class="t-headline">앉은 시간 부담이란?</div><div class="t-footnote" style="margin-top:4px">가만히 있으면 분당 1씩 늘고, 걸으면 분당 2씩 줄어듭니다. 목 기울기 부담과 더해 알림 시점을 정합니다.</div></div></div>
+    </div></div></div>
+</div>
+</body>
+</html>
