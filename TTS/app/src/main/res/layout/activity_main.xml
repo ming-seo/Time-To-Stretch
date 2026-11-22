@@ -23,7 +23,7 @@
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:accessibilityHeading="true"
-            android:text="자세 관리" />
+            android:text="@string/main_title" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -48,7 +48,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="꺼짐" />
+                android:text="@string/status_off" />
         </LinearLayout>
 
         <!-- Focal card: progress toward the stretch reminder -->
@@ -68,7 +68,7 @@
                     style="@style/Text.TTS.Footnote"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="스트레칭 알림까지" />
+                    android:text="@string/main_until_reminder" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -110,7 +110,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="목 기울기와 앉은 시간 부담의 합이 30이 되면 알림이 와요" />
+                    android:text="@string/main_total_caption" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -120,7 +120,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="측정" />
+            android:text="@string/main_section_tracking" />
 
         <com.google.android.material.card.MaterialCardView
             style="@style/Widget.TTS.InsetGroup"
@@ -145,13 +145,13 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:labelFor="@id/switchMonitoring"
-                    android:text="백그라운드 측정" />
+                    android:text="@string/main_background_tracking" />
 
                 <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchMonitoring"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:contentDescription="백그라운드 측정"
+                    android:contentDescription="@string/main_background_tracking"
                     android:minHeight="44dp"
                     android:saveEnabled="false"
                     android:thumb="@drawable/switch_thumb"
@@ -164,7 +164,7 @@
             style="@style/Text.TTS.SectionFooter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="앱을 닫아도 휴대폰이 목 기울기와 앉아 있는 시간을 계속 잽니다." />
+            android:text="@string/main_tracking_footer" />
 
         <!-- Section: current load -->
         <TextView
@@ -172,7 +172,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="현재 부담" />
+            android:text="@string/main_section_debt" />
 
         <com.google.android.material.card.MaterialCardView
             style="@style/Widget.TTS.InsetGroup"
@@ -200,7 +200,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="목 기울기" />
+                        android:text="@string/neck_tilt" />
 
                     <TextView
                         android:id="@+id/tvNeckDebt"
@@ -236,14 +236,14 @@
                             style="@style/Text.TTS.Body"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="앉은 시간" />
+                            android:text="@string/sitting_time" />
 
                         <TextView
                             android:id="@+id/tvSitState"
                             style="@style/Text.TTS.Footnote"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="측정 꺼짐" />
+                            android:text="@string/tracking_off" />
                     </LinearLayout>
 
                     <TextView
@@ -261,7 +261,7 @@
             style="@style/Text.TTS.SectionFooter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="아직 계산하지 않았어요" />
+            android:text="@string/not_calculated" />
 
         <!-- Tools -->
         <com.google.android.material.card.MaterialCardView
@@ -286,7 +286,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="목 각도 디버그" />
+                        android:text="@string/main_neck_debug" />
 
                     <ImageView
                         android:layout_width="17dp"
@@ -305,7 +305,7 @@
                     style="@style/Widget.TTS.Row.Tappable"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="D 값 초기화"
+                    android:text="@string/reset_d"
                     android:textColor="@color/red"
                     android:textSize="17sp" />
             </LinearLayout>
@@ -327,7 +327,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:paddingBottom="7dp"
-                android:text="활동 전환 기록" />
+                android:text="@string/main_activity_log" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnClearLog"
@@ -336,7 +336,7 @@
                 android:layout_height="wrap_content"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
-                android:text="지우기" />
+                android:text="@string/clear" />
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
@@ -352,7 +352,7 @@
                 android:fontFeatureSettings="tnum"
                 android:lineSpacingExtra="6dp"
                 android:padding="16dp"
-                android:text="아직 기록이 없어요" />
+                android:text="@string/no_records" />
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

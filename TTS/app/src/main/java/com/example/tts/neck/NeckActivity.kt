@@ -56,19 +56,26 @@ class NeckActivity : AppCompatActivity() {
 
     private fun refreshUi() {
         val state = NeckLiveState
-        tvTilt.text = "폰 기울기 θ: " + (state.currentTilt?.let { fmt(it) + "°" } ?: "-")
-        tvThetaC.text = "목 각도 θ_C: " + (state.frameThetaC?.let { fmt(it) + "°" + ageText(state.frameThetaCMs) } ?: "-")
-        tvScreenInUse.text = "화면 사용 중: " + if (!state.running) "-" else if (state.screenInUse) "예" else "아니오"
+        tvTilt.text = getString(R.string.neck_phone_tilt, state.currentTilt?.let { fmt(it) + "°" } ?: "-")
+        tvThetaC.text = getString(R.string.neck_theta_c, state.frameThetaC?.let { fmt(it) + "°" + ageText(state.frameThetaCMs) } ?: "-")
+        tvScreenInUse.text = getString(
+            R.string.neck_screen_in_use,
+            if (!state.running) "-" else getString(if (state.screenInUse) R.string.yes else R.string.no),
+        )
         tvLastCycle.text = state.lastCycle?.let {
-            "마지막 60초: CATA " + (it.cata?.let { c -> fmt(c) + "°" } ?: "-") +
-                " · 유효 윈도우 ${it.validWindowCount}/${it.windowCount}" +
-                " · 상태 ${state.lastState ?: "-"}" +
+            getString(
+                R.string.neck_last_cycle,
+                it.cata?.let { c -> fmt(c) + "°" } ?: "-", it.validWindowCount, it.windowCount, state.lastState ?: "-",
+            ) +
                 "\n" + sampleText(state.lastCycleSample) +
-                "\n목 각도 " + (state.lastNeck?.let { n -> fmt(n.deg) + "° (${n.source})" } ?: if (it.cata != null) "- (CATA)" else "-")
-        } ?: "마지막 60초: -"
+                "\n" + getString(
+                    R.string.neck_angle,
+                    state.lastNeck?.let { n -> fmt(n.deg) + "° (${n.source})" } ?: if (it.cata != null) "- (CATA)" else "-",
+                )
+        } ?: getString(R.string.neck_last_cycle_none)
         val debt = getSharedPreferences(NeckDebtCalculator.PREFS, MODE_PRIVATE).getFloat(NeckDebtCalculator.KEY_DEBT, 0f)
         tvDebt.text = "D_n: " + String.format(Locale.US, "%.2f", debt)
-        tvLogDir.text = "로그: " + (state.logDir ?: "-")
+        tvLogDir.text = getString(R.string.neck_log, state.logDir ?: "-")
     }
 
     private fun fmt(v: Double): String = String.format(Locale.US, "%.1f", v)
@@ -76,13 +83,14 @@ class NeckActivity : AppCompatActivity() {
     /** Empty while the frame is fresh (a burst is running), otherwise how long ago it was measured. */
     private fun ageText(timeMs: Long): String {
         val ageSec = (System.currentTimeMillis() - timeMs) / 1000
-        return if (ageSec < 2) "" else if (ageSec < 60) " (${ageSec}초 전)" else " (${ageSec / 60}분 ${ageSec % 60}초 전)"
+        return if (ageSec < 2) "" else if (ageSec < 60) " (" + getString(R.string.age_sec, ageSec) + ")"
+        else " (" + getString(R.string.age_min_sec, ageSec / 60, ageSec % 60) + ")"
     }
 
     private fun sampleText(sample: FaceSample?): String = when {
-        sample == null -> "측정 없음"
-        sample.ok -> "측정 성공 (θ_C ${fmt(sample.neckDeg!!)}°)"
-        else -> "측정 실패 (${sample.failReason})"
+        sample == null -> getString(R.string.sample_none)
+        sample.ok -> getString(R.string.sample_ok, fmt(sample.neckDeg!!))
+        else -> getString(R.string.sample_fail, sample.failReason)
     }
 
     companion object {

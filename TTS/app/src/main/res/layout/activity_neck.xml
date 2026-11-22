@@ -9,7 +9,7 @@
         android:id="@+id/btnOpenCollect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="자세 데이터 수집" />
+        android:text="@string/collect_title" />
 
     <TextView
         android:id="@+id/tvTilt"

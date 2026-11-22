@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.example.tts.ActivityTransitionReceiver
 import com.example.tts.MainActivity
+import com.example.tts.R
 import com.example.tts.SedentaryTracker
 import com.example.tts.neck.NeckDebtCalculator
 import com.example.tts.neck.NeckSensingService
@@ -148,15 +149,15 @@ object Stretch {
 
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "스트레칭 알림", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.channel_stretch), NotificationManager.IMPORTANCE_DEFAULT)
         )
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        val reason = if (W_N * dn >= W_S * ds) "목을 오래 숙이고 있었어요" else "오래 앉아 있었어요"
+        val reason = context.getString(if (W_N * dn >= W_S * ds) R.string.stretch_reason_neck else R.string.stretch_reason_sit)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("스트레칭할 시간이에요")
+            .setContentTitle(context.getString(R.string.stretch_title))
             .setContentText("$reason (D = %.1f)".format(combined))
             .setContentIntent(open)
             .setAutoCancel(true)

@@ -38,12 +38,12 @@
         <activity
             android:name=".neck.NeckActivity"
             android:exported="true"
-            android:label="목 각도" />
+            android:label="@string/neck_title" />
 
         <activity
             android:name=".neck.NeckCollectActivity"
             android:exported="false"
-            android:label="자세 데이터 수집"
+            android:label="@string/collect_title"
             android:screenOrientation="portrait" />
 
         <receiver

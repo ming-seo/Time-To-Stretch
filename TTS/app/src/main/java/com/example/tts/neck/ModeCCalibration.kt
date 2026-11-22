@@ -1,20 +1,22 @@
 package com.example.tts.neck
 
+import androidx.annotation.StringRes
+import com.example.tts.R
 import java.io.File
 import java.util.Locale
 import kotlin.math.abs
 
 /** Mode C calibration steps (design doc §11.4): target face pitch/yaw relative to the camera (°). */
-enum class CalibrationStep(val label: String, val pitch: Double, val yaw: Double) {
-    FRONT("정면", 0.0, 0.0),
-    UP_22("위 22.5°", -22.5, 0.0),
-    UP_45("위 45°", -45.0, 0.0),
-    DOWN_22("아래 22.5°", 22.5, 0.0),
-    DOWN_45("아래 45°", 45.0, 0.0),
-    LEFT_22("왼쪽 22.5°", 0.0, -22.5),
-    LEFT_45("왼쪽 45°", 0.0, -45.0),
-    RIGHT_22("오른쪽 22.5°", 0.0, 22.5),
-    RIGHT_45("오른쪽 45°", 0.0, 45.0),
+enum class CalibrationStep(@StringRes val label: Int, val pitch: Double, val yaw: Double) {
+    FRONT(R.string.step_front, 0.0, 0.0),
+    UP_22(R.string.step_up_22, -22.5, 0.0),
+    UP_45(R.string.step_up_45, -45.0, 0.0),
+    DOWN_22(R.string.step_down_22, 22.5, 0.0),
+    DOWN_45(R.string.step_down_45, 45.0, 0.0),
+    LEFT_22(R.string.step_left_22, 0.0, -22.5),
+    LEFT_45(R.string.step_left_45, 0.0, -45.0),
+    RIGHT_22(R.string.step_right_22, 0.0, 22.5),
+    RIGHT_45(R.string.step_right_45, 0.0, 45.0),
 }
 
 /**

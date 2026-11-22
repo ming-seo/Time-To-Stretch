@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         if (results.filterKeys { it != Manifest.permission.CAMERA }.values.all { it }) {
             startMonitoring()
         } else {
-            Toast.makeText(this, "측정에 필요한 권한이 없습니다", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.permission_missing, Toast.LENGTH_LONG).show()
             refreshUi()
         }
     }
@@ -167,10 +167,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun confirmResetDebts() {
         val dialog = AlertDialog.Builder(this)
-            .setTitle("D 값을 초기화할까요?")
-            .setMessage("목 기울기와 앉은 시간 부담을 0으로 되돌립니다. 바른 자세 기준과 보정 데이터는 그대로 둡니다.")
-            .setPositiveButton("초기화") { _, _ -> resetDebts() }
-            .setNegativeButton("취소", null)
+            .setTitle(R.string.reset_d_title)
+            .setMessage(R.string.reset_d_message)
+            .setPositiveButton(R.string.reset) { _, _ -> resetDebts() }
+            .setNegativeButton(R.string.cancel, null)
             .show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(this, R.color.red))
     }
@@ -198,7 +198,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onResetDone() {
-        Toast.makeText(this, "D 값을 초기화했습니다", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, R.string.reset_d_done, Toast.LENGTH_SHORT).show()
         refreshUi()
     }
 
@@ -216,9 +216,9 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.getColor(this, if (running) R.color.green_dot else R.color.gray)
         )
         val (state, detail) = when {
-            running -> "측정 중" to " · 앱을 닫아도 계속 잽니다"
-            enabled -> "시작 중…" to ""
-            else -> "꺼짐" to " · 아래에서 측정을 켜 주세요"
+            running -> getString(R.string.status_tracking) to " · " + getString(R.string.status_tracking_detail)
+            enabled -> getString(R.string.status_starting) to ""
+            else -> getString(R.string.status_off) to " · " + getString(R.string.status_off_detail)
         }
         tvStatus.setTextColor(secondary)
         tvStatus.text = SpannableString(state + detail).apply {
@@ -239,22 +239,22 @@ class MainActivity : AppCompatActivity() {
         tvNeckDebt.text = ONE_DECIMAL.format(dn)
         tvSitDebt.text = ONE_DECIMAL.format(ds)
         tvSitState.text = when {
-            !tracker.isMonitoring() -> "측정 꺼짐"
-            tracker.isStill() -> "정지 중"
-            else -> "움직이는 중"
+            !tracker.isMonitoring() -> getString(R.string.tracking_off)
+            tracker.isStill() -> getString(R.string.sit_still)
+            else -> getString(R.string.sit_moving)
         }
         tvLastEval.text = Stretch.lastEvalAt(this).takeIf { it > 0 }
-            ?.let { "마지막 계산 ${TIME_FORMAT.format(it)} · 1분마다 갱신" } ?: "아직 계산하지 않았어요"
+            ?.let { getString(R.string.last_eval, TIME_FORMAT.format(it)) } ?: getString(R.string.not_calculated)
 
         tvLog.text = tracker.getLog().lines().filter { it.isNotBlank() }
             .joinToString("\n") { describeLogLine(it) }
-            .ifBlank { "아직 기록이 없어요" }
+            .ifBlank { getString(R.string.no_records) }
     }
 
     /** Stored lines look like "STILL ENTER @ 18:59:33"; show them in plain words. */
     private fun describeLogLine(line: String): String {
         val (event, time) = line.split(" @ ").let { it[0] to it.getOrElse(1) { "" } }
-        val label = LOG_LABELS[event] ?: event
+        val label = LOG_LABELS[event]?.let { getString(it) } ?: event
         return if (time.isEmpty()) label else "$time   $label"
     }
 
@@ -265,10 +265,10 @@ class MainActivity : AppCompatActivity() {
         private const val ONE_DECIMAL = "%.1f"
         private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         private val LOG_LABELS = mapOf(
-            "STILL ENTER" to "정지 시작",
-            "STILL EXIT" to "정지 끝",
-            "WALKING ENTER" to "걷기 시작",
-            "RUNNING ENTER" to "달리기 시작",
+            "STILL ENTER" to R.string.log_still_enter,
+            "STILL EXIT" to R.string.log_still_exit,
+            "WALKING ENTER" to R.string.log_walking_enter,
+            "RUNNING ENTER" to R.string.log_running_enter,
         )
     }
 }
